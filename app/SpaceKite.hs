@@ -115,25 +115,26 @@ readDataSet = do
 dot :: Position -> Position -> Int
 dot (lx, ly, lz) (rx, ry, rz) = (lx * rx) + (ly * ry) + (lz * rz)
 
-magnitude :: Floating a => Position -> a
-magnitude (x, y, z) = sqrt (fx * fx + fy * fy + fz * fz)
-  where fx = fromIntegral x
-        fy = fromIntegral y
-        fz = fromIntegral z
-
+-- magnitude :: Position -> Rational
+-- magnitude (x, y, z) = sqrt (fx * fx + fy * fy + fz * fz)
+--   where fx = fromIntegral x
+--         fy = fromIntegral y
+--         fz = fromIntegral z
+-- 
 magnitudeSquare :: Position -> Int
 magnitudeSquare (x, y, z) = x * x + y * y + z * z
 
 type Segment = (Position, Position)
 
-getDistance :: Floating a => Segment -> Position -> a
-getDistance (startPosition, arrivalPosition) planetPosition =
+getDistanceSquare :: Segment -> Position -> Rational
+getDistanceSquare (startPosition, arrivalPosition) planetPosition =
   let vecA = arrivalPosition .- startPosition in
   let vecB = planetPosition .- startPosition in
-  let cosTheta = dotf vecA vecB / ((magnitude vecA) * (magnitude vecB)) in
-  let sinTheta = sqrt $ 1 - (cosTheta * cosTheta) in
-  sinTheta * (magnitude vecB)
+  let cosThetaSquare = (dotf vecA vecB) * (dotf vecA vecB) / ((magnitudeSquaref vecA) * (magnitudeSquaref vecB)) in
+  let sinThetaSquare = 1 - cosThetaSquare in
+  sinThetaSquare * (magnitudeSquaref vecB)
     where dotf x y = fromIntegral $ dot x y
+          magnitudeSquaref = fromIntegral . magnitudeSquare
 
 isInSegment :: Segment -> Position -> Bool
 isInSegment (startPosition, arrivalPosition) planetPosition =
@@ -150,8 +151,8 @@ createSegments (DataSet { playerPos = playerPos, spotPoses = spotPoses }) =
 type Index = Int
 isCommunicatable :: DataSet -> Segment -> (Index, PlanetPos) -> Maybe Index
 isCommunicatable dataSet segment (index, planetPos) =
-  if (distance <= limit) && inSegment then Just index else Nothing
-  where distance = getDistance segment planetPos
+  if (distanceSquare <= limit * limit) && inSegment then Just index else Nothing
+  where distanceSquare = getDistanceSquare segment planetPos
         comDistance = communicationDistance $ header dataSet
         radious = planetRadious $ header dataSet
         limit = fromIntegral $ radious + comDistance
@@ -164,11 +165,11 @@ getCommunicatablePlanets dataSet = do
   let maybeIndex = isCommunicatable dataSet segment indexWithPlanet
   maybeToList maybeIndex
 
-getDistances :: DataSet -> [Double]
-getDistances dataSet = do
+getDistanceSquares :: DataSet -> [Rational]
+getDistanceSquares dataSet = do
   segment <- createSegments dataSet
   spotPos <- planetPoses dataSet
-  return $ getDistance segment spotPos
+  return $ getDistanceSquare segment spotPos
 
 doLogic :: Int -> IO ()
 doLogic iteration = do
@@ -177,7 +178,7 @@ doLogic iteration = do
   let dataSets = run readDataSets allInput
   print $ show $ dataSets
   print $ show $ (map getCommunicatablePlanets) `fmap` dataSets
-  print $ show $ (map getDistances) `fmap` dataSets
+  print $ show $ (map getDistanceSquares) `fmap` dataSets
 
 main :: IO ()
 main = do

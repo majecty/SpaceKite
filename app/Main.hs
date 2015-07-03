@@ -101,8 +101,9 @@ readDataSet = do
 doLogic :: Int -> IO ()
 doLogic iteration = do
   allInput <- getContents
-  let dataSet = run readDataSet allInput
-  print $ show $ dataSet
+  let readDataSets = sequence $ take iteration $ repeat readDataSet
+  let dataSets = run readDataSets allInput
+  print $ show $ dataSets
 
 main :: IO ()
 main = do

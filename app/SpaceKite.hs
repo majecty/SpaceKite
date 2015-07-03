@@ -122,6 +122,10 @@ readDataSet = do
 dot :: Position -> Position -> Rational
 dot (lx, ly, lz) (rx, ry, rz) = (lx * rx) + (ly * ry) + (lz * rz)
 
+interpolate :: Position -> Position -> Rational -> Position
+interpolate (lx, ly, lz) (rx, ry, rz) ratio = (interpolate1 lx rx, interpolate1 ly ry, interpolate1 lz rz)
+  where interpolate1 a b = a * ratio + b * (1 - ratio)
+
 magnitudeSquare :: Position -> Rational
 magnitudeSquare (x, y, z) = x * x + y * y + z * z
 
@@ -197,22 +201,21 @@ getPlanetsInPoint playerPos = do
     where distanceSquareFrom = distanceSquare playerPos
           isEqualInternalValue value = (== value) . getValue
 
-getNextSpecificPoint :: Segment -> Reader DataSet Position
-getNextSpecificPoint segment@(_, endPos) = return endPos -- FIXME: Not Implemented.
+getNextSpecificPoint :: Segment -> Rational -> Reader DataSet Rational
+getNextSpecificPoint segment@(_, endPos) currentRatio = return 1 -- FIXME: Not Implemented.
 
-findPlanetsInSegment :: Segment -> Reader DataSet [Index]
-findPlanetsInSegment segment@(startPos, endPos)
-  | startPos == endPos = getPlanetsInPoint startPos
-  | otherwise = do
-    planetsInPoint <- getPlanetsInPoint startPos
-    nextSpecificPoint <- getNextSpecificPoint segment
-    ((++) planetsInPoint) `fmap` (findPlanetsInSegment (nextSpecificPoint, endPos))
+findPlanetsInSegment :: Rational -> Segment -> Reader DataSet [Index]
+findPlanetsInSegment 1 (_, endPos) = getPlanetsInPoint endPos
+findPlanetsInSegment currentRatio segment@(startPos, endPos) = do
+  planetsInPoint <- getPlanetsInPoint $ interpolate startPos endPos currentRatio
+  nextRatio <- getNextSpecificPoint segment currentRatio
+  ((++) planetsInPoint) `fmap` (findPlanetsInSegment nextRatio segment)
 
 findAllPlanets :: Reader DataSet [Index]
 findAllPlanets = do
   dataSet <- ask
   let segments = createSegments dataSet
-  planetIndexes <- concat `fmap` mapM findPlanetsInSegment segments
+  planetIndexes <- concat `fmap` mapM (findPlanetsInSegment 0) segments
   return $ sort $ nub $ planetIndexes
 
 runOnce :: DataSet -> [Index]

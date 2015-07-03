@@ -68,6 +68,10 @@ type Position = (Int, Int, Int)
 
 type PlanetPos = Position
 
+type PlayerPos = Position
+
+type SpotPos = Position
+
 readHeader :: Parser Header
 readHeader = Header `fmap` numOfPlanet <*> numOfSpot <*> planetRadious <*> communicationDistance
   where
@@ -86,11 +90,13 @@ readPos = (,,) `fmap` x <*> y <*> z
 readPositions :: Int -> Parser [Position]
 readPositions numOfPosition = sequence $ take numOfPosition $ repeat readPos
 
-readDataSet :: Parser (Header, [PlanetPos])
+readDataSet :: Parser (Header, [PlanetPos], PlayerPos, [SpotPos])
 readDataSet = do
   header <- readHeader
   planetPoses <- readPositions (numOfPlanet header)
-  return (header, planetPoses)
+  playerPos <- readPos
+  spotPoses <- readPositions (numOfSpot header)
+  return (header, planetPoses, playerPos, spotPoses)
 
 doLogic :: Int -> IO ()
 doLogic iteration = do

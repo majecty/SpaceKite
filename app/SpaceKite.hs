@@ -1,3 +1,6 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE FlexibleInstances #-}
 -- module SpaceKite(
 --   getDistance,
 --   isInSegment
@@ -193,7 +196,35 @@ getDistanceAndDirection segment@(playerPos, spotPos) planetPos =
 -- getNextSpecificPoint :: (PlayerPos, SpotPos) -> Reader DataSet Position
 -- getNextSpecificPoint (playerPos, spotPos) =
 
+class Monad m => MonadReader e m | m -> e where
+  ask :: m e
 
+data Reader e a = Reader { runReader :: e -> a }
+
+instance Monad (Reader e) where
+  return x = Reader $ \_ -> x
+  (>>=) (Reader reader) f = Reader $ \env -> runReader (f (reader env)) env
+
+instance MonadReader e (Reader e) where
+  ask = Reader $ id
+
+instance Applicative (Reader e) where
+  pure x = return x
+  (<*>) mf ma = do
+    f <- mf
+    a <- ma
+    return $ f a
+
+instance Functor (Reader e) where
+  fmap f ma = do
+    a <- ma
+    return $ f a
+
+getPlanetsInPoint :: PlayerPos -> Reader DataSet [Index]
+getPlanetsInPoint playerPos = return [] -- FIXME: Not Implemented.
+
+getNextSpecificPoint :: Segment -> Reader DataSet Position
+getNextSpecificPoint segment = return (0, 0, 0) -- FIXME: Not Implemented.
 
 findPlanetsInSegment :: Segment -> Reader DataSet [Index]
 findPlanetsInSegment segment@(startPos, endPos)
@@ -202,8 +233,7 @@ findPlanetsInSegment segment@(startPos, endPos)
     dataSet <- ask
     planetsInPoint <- getPlanetsInPoint startPos
     nextSpecificPoint <- getNextSpecificPoint segment
-    ((++) planetsInPoint) `fmap` nextCalc
-    where nextCalc = findPlanetsInSegment (nextSpecificPoint endPos)
+    ((++) planetsInPoint) `fmap` (findPlanetsInSegment (nextSpecificPoint, endPos))
 
 doLogic :: Int -> IO ()
 doLogic iteration = do

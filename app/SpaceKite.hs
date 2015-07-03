@@ -177,13 +177,21 @@ doLogic iteration = do
   allInput <- getContents
   let readDataSets = sequence $ take iteration $ repeat readDataSet
   let dataSets = run readDataSets allInput
-  print $ show $ dataSets
-  print $ show $ (map getCommunicatablePlanets) `fmap` dataSets
-  print $ show $ (map getDistanceSquares) `fmap` dataSets
+  let maybeResults = (map getCommunicatablePlanets) `fmap` dataSets
+  let strs = map resultToStr `fmap` maybeResults
+  -- print strs
+  case strs of
+    Nothing -> return ()
+    Just xs -> mapM_ putStrLn xs
+  where resultToStr lst =
+          let lstWithCount = length lst : lst in
+          let strs = map show lstWithCount in
+          concat $ intersperse " " strs
+  -- print $ show $ dataSets
+  -- print $ show $ (map getCommunicatablePlanets) `fmap` dataSets
+  -- print $ show $ (map getDistanceSquares) `fmap` dataSets
 
 main :: IO ()
 main = do
-  print "Start"
   iteration <- read `fmap` getLine
   doLogic iteration
-  print "hi"

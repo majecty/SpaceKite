@@ -49,6 +49,9 @@ parseFail = Parser $ \_ -> Nothing
 readInt :: Parser Int
 readInt = Parser $ listToMaybe `fmap` reads
 
+readRational :: Parser Rational
+readRational = fromIntegral `fmap` readInt
+
 readWhiteSpace :: Parser ()
 readWhiteSpace = do
   isWhite <- isWhiteSpace `fmap` lookAhead
@@ -72,7 +75,7 @@ data Header = Header {
   communicationDistance :: Int
 } deriving Show
 
-type Position = (Int, Int, Int)
+type Position = (Rational, Rational, Rational)
 
 type PlanetPos = Position
 
@@ -98,9 +101,9 @@ readHeader = Header `fmap` numOfPlanet <*> numOfSpot <*> planetRadious <*> commu
 readPos :: Parser Position
 readPos = (,,) `fmap` x <*> y <*> z
   where
-    x = readInt
-    y = readWhiteSpace *> readInt
-    z = readWhiteSpace *> readInt
+    x = readRational
+    y = readWhiteSpace *> readRational
+    z = readWhiteSpace *> readRational
 
 readPositions :: Int -> Parser [Position]
 readPositions numOfPosition = sequence $ take numOfPosition $ repeat readPos
@@ -116,13 +119,13 @@ readDataSet = do
 (.-) :: Position -> Position -> Position
 (.-) (lx, ly, lz) (rx, ry, rz) = (lx - rx, ly - ry, lz - rz)
 
-dot :: Position -> Position -> Int
+dot :: Position -> Position -> Rational
 dot (lx, ly, lz) (rx, ry, rz) = (lx * rx) + (ly * ry) + (lz * rz)
 
-magnitudeSquare :: Position -> Int
+magnitudeSquare :: Position -> Rational
 magnitudeSquare (x, y, z) = x * x + y * y + z * z
 
-distanceSquare :: Position -> Position -> Int
+distanceSquare :: Position -> Position -> Rational
 distanceSquare posX posY = magnitudeSquare (posX .- posY)
 
 type Segment = (Position, Position)
@@ -158,7 +161,7 @@ instance Functor (Reader e) where
     a <- ma
     return $ f a
 
-newtype Indexed a = Indexed (Int, a)
+newtype Indexed a = Indexed (Index, a)
   deriving Show
 
 instance Functor Indexed where
@@ -167,7 +170,7 @@ instance Functor Indexed where
 getValue :: Indexed a -> a
 getValue (Indexed (_, a)) = a
 
-getIndex :: Indexed a -> Int
+getIndex :: Indexed a -> Index
 getIndex (Indexed (index, _)) = index
 
 getLimit :: Reader DataSet Int

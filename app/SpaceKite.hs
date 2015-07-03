@@ -1,4 +1,7 @@
-module SpaceKite(getDistance) where
+module SpaceKite(
+  getDistance,
+  isInSegment
+  ) where
 
 import Control.Applicative
 import Data.Maybe
@@ -117,6 +120,9 @@ magnitude (x, y, z) = sqrt (fx * fx + fy * fy + fz * fz)
         fy = fromIntegral y
         fz = fromIntegral z
 
+magnitudeSquare :: Position -> Int
+magnitudeSquare (x, y, z) = x * x + y * y + z * z
+
 getDistance :: Floating a => (Position, Position) -> Position -> a
 getDistance (startPosition, arrivalPosition) planetPosition =
   let vecA = arrivalPosition .- startPosition in
@@ -125,8 +131,13 @@ getDistance (startPosition, arrivalPosition) planetPosition =
   let sinTheta = sqrt $ 1 - (cosTheta * cosTheta) in
   sinTheta * (magnitude vecB)
     where dotf x y = fromIntegral $ dot x y
-  
--- TODO: is suseon in segment
+
+isInSegment :: (Position, Position) -> Position -> Bool
+isInSegment (startPosition, arrivalPosition) planetPosition =
+  let vecA = arrivalPosition .- startPosition in
+  let vecB = planetPosition .- startPosition in
+  let dotAB = dot vecA vecB in
+  0 <= dotAB && dotAB <= (magnitudeSquare vecA)
 
 doLogic :: Int -> IO ()
 doLogic iteration = do

@@ -11,3 +11,7 @@ main :: IO ()
 main = do
   describe "check distance" $
     5.0 `should` getDistance ((0, 0, 0), (10, 0, 0)) (0, 5, 0)
+  describe "check isInSegment" $
+    True `should` isInSegment ((0, 0, 0), (10, 0, 0)) (0, 5, 0)
+  describe "check False case of isInSegment" $
+    False `should` isInSegment ((0, 0, 0), (10, 0, 0)) (-1, 0, 0)

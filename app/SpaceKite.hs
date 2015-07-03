@@ -1,7 +1,8 @@
-module SpaceKite(
-  getDistance,
-  isInSegment
-  ) where
+-- module SpaceKite(
+--   getDistance,
+--   isInSegment
+--   ) where
+module Main where
 
 import Control.Applicative
 import Data.Maybe
@@ -158,15 +159,15 @@ getCommunicatablePlanets :: DataSet -> [Index]
 getCommunicatablePlanets dataSet = do
   segment <- createSegments dataSet
   indexWithPlanet <- zip [1..] $ spotPoses dataSet
-  let Just index = isCommunicatable dataSet segment indexWithPlanet
-  return index
+  let maybeIndex = isCommunicatable dataSet segment indexWithPlanet
+  maybeToList maybeIndex
 
 doLogic :: Int -> IO ()
 doLogic iteration = do
   allInput <- getContents
   let readDataSets = sequence $ take iteration $ repeat readDataSet
   let dataSets = run readDataSets allInput
-  print $ show $ dataSets
+  print $ show $ (map getCommunicatablePlanets) `fmap` dataSets
 
 main :: IO ()
 main = do

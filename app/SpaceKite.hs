@@ -124,77 +124,12 @@ magnitudeSquare (x, y, z) = x * x + y * y + z * z
 
 type Segment = (Position, Position)
 
-getDistanceSquare :: Segment -> Position -> Rational
-getDistanceSquare (startPosition, arrivalPosition) planetPosition =
-  let vecA = arrivalPosition .- startPosition in
-  let vecB = planetPosition .- startPosition in
-  let cosThetaSquare = (dotf vecA vecB) * (dotf vecA vecB) / ((magnitudeSquaref vecA) * (magnitudeSquaref vecB)) in
-  let sinThetaSquare = 1 - cosThetaSquare in
-  sinThetaSquare * (magnitudeSquaref vecB)
-    where dotf x y = fromIntegral $ dot x y
-          magnitudeSquaref = fromIntegral . magnitudeSquare
-
-isInSegment :: Segment -> Position -> Bool
-isInSegment (startPosition, arrivalPosition) planetPosition =
-  let vecA = arrivalPosition .- startPosition in
-  let vecB = planetPosition .- startPosition in
-  let dotAB = dot vecA vecB in
-  0 <= dotAB && dotAB <= (magnitudeSquare vecA)
-
 createSegments :: DataSet -> [Segment]
 createSegments (DataSet { playerPos = playerPos, spotPoses = spotPoses }) =
   let allPoints = playerPos : spotPoses in
   zip allPoints spotPoses
 
 type Index = Int
-isCommunicatable :: DataSet -> Segment -> (Index, PlanetPos) -> Maybe Index
-isCommunicatable dataSet segment (index, planetPos) =
-  if (distanceSquare <= limit * limit) && inSegment then Just index else Nothing
-  where distanceSquare = getDistanceSquare segment planetPos
-        comDistance = communicationDistance $ header dataSet
-        radious = planetRadious $ header dataSet
-        limit = fromIntegral $ radious + comDistance
-        inSegment = isInSegment segment planetPos
-
-getCommunicatablePlanets :: DataSet -> [Index]
-getCommunicatablePlanets dataSet = sort $ nub $ do
-  indexWithPlanet <- zip [1..] $ planetPoses dataSet
-  segment <- createSegments dataSet
-  let maybeIndex = isCommunicatable dataSet segment indexWithPlanet
-  maybeToList maybeIndex
-
-getDistanceSquares :: DataSet -> [Rational]
-getDistanceSquares dataSet = do
-  segment <- createSegments dataSet
-  spotPos <- planetPoses dataSet
-  return $ getDistanceSquare segment spotPos
-
-data Direction = Approaching | GoingAway
-
-data DistanceAndDirection = DistanceAndDirection {
-  distanceSquare :: Int,
-  direction :: Direction,
-  planetIndex :: Index,
-  planetPosition :: Position
-}
-
-getDirection :: (PlayerPos, SpotPos) -> PlanetPos -> Direction
-getDirection (playerPos, spotPos) planetPos =
-  let vecA = spotPos .- playerPos in
-  let vecB = planetPos .- playerPos in
-  let dotAB = dot vecA vecB in
-  if dotAB >= 0 then GoingAway else Approaching
-
-getDistanceAndDirection :: (PlayerPos, SpotPos) -> PlanetPos -> DistanceAndDirection
-getDistanceAndDirection segment@(playerPos, spotPos) planetPos =
-  DistanceAndDirection {
-    distanceSquare = magnitudeSquare diffVec,
-    direction = getDirection segment planetPos
-  }
-    where diffVec = planetPos .- playerPos
-
--- getNextSpecificPoint :: (PlayerPos, SpotPos) -> Reader DataSet Position
--- getNextSpecificPoint (playerPos, spotPos) =
 
 class Monad m => MonadReader e m | m -> e where
   ask :: m e
@@ -240,19 +175,11 @@ doLogic iteration = do
   allInput <- getContents
   let readDataSets = sequence $ take iteration $ repeat readDataSet
   let dataSets = run readDataSets allInput
-  let maybeResults = (map getCommunicatablePlanets) `fmap` dataSets
-  let strs = map resultToStr `fmap` maybeResults
-  -- print strs
-  case strs of
-    Nothing -> return ()
-    Just xs -> mapM_ putStrLn xs
-  where resultToStr lst =
-          let lstWithCount = length lst : lst in
-          let strs = map show lstWithCount in
-          concat $ intersperse " " strs
-  -- print $ show $ dataSets
-  -- print $ show $ (map getCommunicatablePlanets) `fmap` dataSets
-  -- print $ show $ (map getDistanceSquares) `fmap` dataSets
+  -- where resultToStr lst =
+  --         let lstWithCount = length lst : lst in
+  --         let strs = map show lstWithCount in
+  --         concat $ intersperse " " strs
+  print $ show $ dataSets
 
 main :: IO ()
 main = do

@@ -88,12 +88,17 @@ readPlanetPos = PlanetPos `fmap` x <*> y <*> z
 readPlanetPoses :: Int -> Parser [PlanetPos]
 readPlanetPoses numOfPlanet = sequence $ take numOfPlanet $ repeat readPlanetPos
 
+readDataSet :: Parser (Header, [PlanetPos])
+readDataSet = do
+  header <- readHeader
+  planetPoses <- readPlanetPoses (numOfPlanet header)
+  return (header, planetPoses)
+
 doLogic :: Int -> IO ()
 doLogic iteration = do
-  line <- getLine
-  let header = run readHeader line
-  print $ show $ iteration
-  print $ show $ header
+  allInput <- getContents
+  let dataSet = run readDataSet allInput
+  print $ show $ dataSet
 
 main :: IO ()
 main = do

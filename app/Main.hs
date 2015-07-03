@@ -26,6 +26,9 @@ instance Functor Parser where
     a <- ma
     return $ f a
 
+run :: Parser a -> String -> Maybe a
+run parser input = fst `fmap` parse parser input
+
 consume :: Parser ()
 consume = Parser $
   \input -> case maybeHead input of
@@ -61,21 +64,18 @@ data Header = Header {
   communicationDistance :: Integer
 } deriving Show
 
-readHeader :: String -> Header
-readHeader input =
-  let (numOfPlanet, middle1) = head $ reads input in
-  let (' ', middle2) = head $ reads middle1 in
-  let (numOfSpot, middle3) = head $ reads middle2 in
-  let (' ', middle4) = head $ reads middle3 in
-  let (planetRadious, middle5) = head $ reads middle4 in
-  let (' ', middle6) = head $ reads middle5 in
-  let (communicationDistance, middle7) = head $ reads middle6 in
-  Header numOfPlanet numOfSpot planetRadious communicationDistance
+readHeader :: Parser Header
+readHeader = Header `fmap` numOfPlanet <*> numOfSpot <*> planetRadious <*> communicationDistance
+  where
+    numOfPlanet = readInteger
+    numOfSpot = readWhiteSpace *> readInteger
+    planetRadious = readWhiteSpace *> readInteger
+    communicationDistance = readWhiteSpace *> readInteger
 
 doLogic :: Integer -> IO ()
 doLogic iteration = do
   line <- getLine
-  let header = readHeader line
+  let header = run readHeader line
   print $ show $ iteration
   print $ show $ header
 

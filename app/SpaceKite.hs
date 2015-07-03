@@ -159,7 +159,7 @@ getPlanetsInPoint :: PlayerPos -> Reader DataSet [Index]
 getPlanetsInPoint playerPos = return [] -- FIXME: Not Implemented.
 
 getNextSpecificPoint :: Segment -> Reader DataSet Position
-getNextSpecificPoint segment = return (0, 0, 0) -- FIXME: Not Implemented.
+getNextSpecificPoint segment@(_, endPos) = return endPos -- FIXME: Not Implemented.
 
 findPlanetsInSegment :: Segment -> Reader DataSet [Index]
 findPlanetsInSegment segment@(startPos, endPos)
@@ -170,16 +170,30 @@ findPlanetsInSegment segment@(startPos, endPos)
     nextSpecificPoint <- getNextSpecificPoint segment
     ((++) planetsInPoint) `fmap` (findPlanetsInSegment (nextSpecificPoint, endPos))
 
+findAllPlanets :: Reader DataSet [Index]
+findAllPlanets = do
+  dataSet <- ask
+  let segments = createSegments dataSet
+  planetIndexes <- concat `fmap` mapM findPlanetsInSegment segments
+  return $ sort $ nub $ planetIndexes
+
+runOnce :: DataSet -> [Index]
+runOnce dataSet = runReader findAllPlanets dataSet
+
 doLogic :: Int -> IO ()
 doLogic iteration = do
   allInput <- getContents
   let readDataSets = sequence $ take iteration $ repeat readDataSet
-  let dataSets = run readDataSets allInput
+  let maybeDataSets = run readDataSets allInput
+  let results = case maybeDataSets of
+                  Nothing -> []
+                  Just dataSets -> map runOnce dataSets
+  print $ show $ results
   -- where resultToStr lst =
   --         let lstWithCount = length lst : lst in
   --         let strs = map show lstWithCount in
   --         concat $ intersperse " " strs
-  print $ show $ dataSets
+  print $ show $ maybeDataSets
 
 main :: IO ()
 main = do

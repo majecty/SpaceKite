@@ -150,24 +150,34 @@ createSegments (DataSet { playerPos = playerPos, spotPoses = spotPoses }) =
 type Index = Int
 isCommunicatable :: DataSet -> Segment -> (Index, PlanetPos) -> Maybe Index
 isCommunicatable dataSet segment (index, planetPos) =
-  if (distance < limit) && inSegment then Just index else Nothing
+  if (distance <= limit) && inSegment then Just index else Nothing
   where distance = getDistance segment planetPos
-        limit = fromIntegral $ communicationDistance $ header dataSet
+        comDistance = communicationDistance $ header dataSet
+        radious = planetRadious $ header dataSet
+        limit = fromIntegral $ radious + comDistance
         inSegment = isInSegment segment planetPos
 
 getCommunicatablePlanets :: DataSet -> [Index]
 getCommunicatablePlanets dataSet = do
   segment <- createSegments dataSet
-  indexWithPlanet <- zip [1..] $ spotPoses dataSet
+  indexWithPlanet <- zip [1..] $ planetPoses dataSet
   let maybeIndex = isCommunicatable dataSet segment indexWithPlanet
   maybeToList maybeIndex
+
+getDistances :: DataSet -> [Double]
+getDistances dataSet = do
+  segment <- createSegments dataSet
+  spotPos <- planetPoses dataSet
+  return $ getDistance segment spotPos
 
 doLogic :: Int -> IO ()
 doLogic iteration = do
   allInput <- getContents
   let readDataSets = sequence $ take iteration $ repeat readDataSet
   let dataSets = run readDataSets allInput
+  print $ show $ dataSets
   print $ show $ (map getCommunicatablePlanets) `fmap` dataSets
+  print $ show $ (map getDistances) `fmap` dataSets
 
 main :: IO ()
 main = do

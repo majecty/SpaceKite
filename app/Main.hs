@@ -64,6 +64,12 @@ data Header = Header {
   communicationDistance :: Int
 } deriving Show
 
+data PlanetPos = PlanetPos {
+  x :: Int,
+  y :: Int,
+  z :: Int
+} deriving Show
+
 readHeader :: Parser Header
 readHeader = Header `fmap` numOfPlanet <*> numOfSpot <*> planetRadious <*> communicationDistance
   where
@@ -71,6 +77,16 @@ readHeader = Header `fmap` numOfPlanet <*> numOfSpot <*> planetRadious <*> commu
     numOfSpot = readWhiteSpace *> readInt
     planetRadious = readWhiteSpace *> readInt
     communicationDistance = readWhiteSpace *> readInt
+
+readPlanetPos :: Parser PlanetPos
+readPlanetPos = PlanetPos `fmap` x <*> y <*> z
+  where
+    x = readInt
+    y = readWhiteSpace *> readInt
+    z = readWhiteSpace *> readInt
+
+readPlanetPoses :: Int -> Parser [PlanetPos]
+readPlanetPoses numOfPlanet = sequence $ take numOfPlanet $ repeat readPlanetPos
 
 doLogic :: Int -> IO ()
 doLogic iteration = do

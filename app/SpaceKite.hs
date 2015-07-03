@@ -141,6 +141,26 @@ isInSegment (startPosition, arrivalPosition) planetPosition =
   let dotAB = dot vecA vecB in
   0 <= dotAB && dotAB <= (magnitudeSquare vecA)
 
+createSegments :: DataSet -> [Segment]
+createSegments (DataSet { playerPos = playerPos, spotPoses = spotPoses }) =
+  let allPoints = playerPos : spotPoses in
+  zip allPoints spotPoses
+
+type Index = Int
+isCommunicatable :: DataSet -> Segment -> (Index, PlanetPos) -> Maybe Index
+isCommunicatable dataSet segment (index, planetPos) =
+  if (distance < limit) && inSegment then Just index else Nothing
+  where distance = getDistance segment planetPos
+        limit = fromIntegral $ communicationDistance $ header dataSet
+        inSegment = isInSegment segment planetPos
+
+getCommunicatablePlanets :: DataSet -> [Index]
+getCommunicatablePlanets dataSet = do
+  segment <- createSegments dataSet
+  indexWithPlanet <- zip [1..] $ spotPoses dataSet
+  let Just index = isCommunicatable dataSet segment indexWithPlanet
+  return index
+
 doLogic :: Int -> IO ()
 doLogic iteration = do
   allInput <- getContents

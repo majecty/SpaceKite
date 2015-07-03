@@ -2,13 +2,6 @@ module Main where
 
 import Data.Maybe
 
-data Header = Header {
-  numOfPlanet :: Integer,
-  numOfSpot :: Integer,
-  planetRadious :: Integer,
-  communicationDistance :: Integer
-} deriving Show
-
 data Parser a = Parser { parse :: String -> Maybe (a, String) }
 
 instance Monad Parser where
@@ -22,6 +15,13 @@ instance Monad Parser where
 
 readInteger :: Parser Integer
 readInteger = Parser $ listToMaybe `fmap` reads
+
+data Header = Header {
+  numOfPlanet :: Integer,
+  numOfSpot :: Integer,
+  planetRadious :: Integer,
+  communicationDistance :: Integer
+} deriving Show
 
 readHeader :: String -> Header
 readHeader input =

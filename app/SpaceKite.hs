@@ -123,7 +123,9 @@ magnitude (x, y, z) = sqrt (fx * fx + fy * fy + fz * fz)
 magnitudeSquare :: Position -> Int
 magnitudeSquare (x, y, z) = x * x + y * y + z * z
 
-getDistance :: Floating a => (Position, Position) -> Position -> a
+type Segment = (Position, Position)
+
+getDistance :: Floating a => Segment -> Position -> a
 getDistance (startPosition, arrivalPosition) planetPosition =
   let vecA = arrivalPosition .- startPosition in
   let vecB = planetPosition .- startPosition in
@@ -132,7 +134,7 @@ getDistance (startPosition, arrivalPosition) planetPosition =
   sinTheta * (magnitude vecB)
     where dotf x y = fromIntegral $ dot x y
 
-isInSegment :: (Position, Position) -> Position -> Bool
+isInSegment :: Segment -> Position -> Bool
 isInSegment (startPosition, arrivalPosition) planetPosition =
   let vecA = arrivalPosition .- startPosition in
   let vecB = planetPosition .- startPosition in

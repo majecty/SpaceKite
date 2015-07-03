@@ -122,6 +122,9 @@ dot (lx, ly, lz) (rx, ry, rz) = (lx * rx) + (ly * ry) + (lz * rz)
 magnitudeSquare :: Position -> Int
 magnitudeSquare (x, y, z) = x * x + y * y + z * z
 
+distanceSquare :: Position -> Position -> Int
+distanceSquare posX posY = magnitudeSquare (posX .- posY)
+
 type Segment = (Position, Position)
 
 createSegments :: DataSet -> [Segment]
@@ -155,8 +158,41 @@ instance Functor (Reader e) where
     a <- ma
     return $ f a
 
+newtype Indexed a = Indexed (Int, a)
+  deriving Show
+
+instance Functor Indexed where
+  fmap f (Indexed (index, a)) = Indexed (index, f a)
+
+getValue :: Indexed a -> a
+getValue (Indexed (_, a)) = a
+
+getIndex :: Indexed a -> Int
+getIndex (Indexed (index, _)) = index
+
+getLimit :: Reader DataSet Int
+getLimit = do
+  dataSet <- ask
+  let radious = planetRadious $ header dataSet
+  let maxDistance = communicationDistance $ header dataSet
+  return $ radious + maxDistance
+
+getPlanetsWithIndex :: Reader DataSet [(Indexed Position)]
+getPlanetsWithIndex = do
+  dataSet <- ask
+  return $ map Indexed $ zip [1..] (planetPoses dataSet)
+
 getPlanetsInPoint :: PlayerPos -> Reader DataSet [Index]
-getPlanetsInPoint playerPos = return [] -- FIXME: Not Implemented.
+getPlanetsInPoint playerPos = do
+  limit <- getLimit
+  planetsWithIndex <- getPlanetsWithIndex
+  let distanceSquaresWithIndex = (fmap distanceSquareFrom) `map` planetsWithIndex
+  let distanceSquares = map getValue distanceSquaresWithIndex
+  let minDistanceSquare = minimumBy compare distanceSquares
+  let minimumIndexes = map getIndex $ filter (isEqualInternalValue minDistanceSquare) distanceSquaresWithIndex 
+  return minimumIndexes
+    where distanceSquareFrom = distanceSquare playerPos
+          isEqualInternalValue value = (== value) . getValue
 
 getNextSpecificPoint :: Segment -> Reader DataSet Position
 getNextSpecificPoint segment@(_, endPos) = return endPos -- FIXME: Not Implemented.
@@ -165,7 +201,6 @@ findPlanetsInSegment :: Segment -> Reader DataSet [Index]
 findPlanetsInSegment segment@(startPos, endPos)
   | startPos == endPos = getPlanetsInPoint startPos
   | otherwise = do
-    dataSet <- ask
     planetsInPoint <- getPlanetsInPoint startPos
     nextSpecificPoint <- getNextSpecificPoint segment
     ((++) planetsInPoint) `fmap` (findPlanetsInSegment (nextSpecificPoint, endPos))

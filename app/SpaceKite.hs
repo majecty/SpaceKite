@@ -116,12 +116,6 @@ readDataSet = do
 dot :: Position -> Position -> Int
 dot (lx, ly, lz) (rx, ry, rz) = (lx * rx) + (ly * ry) + (lz * rz)
 
--- magnitude :: Position -> Rational
--- magnitude (x, y, z) = sqrt (fx * fx + fy * fy + fz * fz)
---   where fx = fromIntegral x
---         fy = fromIntegral y
---         fz = fromIntegral z
--- 
 magnitudeSquare :: Position -> Int
 magnitudeSquare (x, y, z) = x * x + y * y + z * z
 

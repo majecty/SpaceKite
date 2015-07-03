@@ -170,7 +170,9 @@ data Direction = Approaching | GoingAway
 
 data DistanceAndDirection = DistanceAndDirection {
   distanceSquare :: Int,
-  direction :: Direction
+  direction :: Direction,
+  planetIndex :: Index,
+  planetPosition :: Position
 }
 
 getDirection :: (PlayerPos, SpotPos) -> PlanetPos -> Direction
@@ -187,6 +189,21 @@ getDistanceAndDirection segment@(playerPos, spotPos) planetPos =
     direction = getDirection segment planetPos
   }
     where diffVec = planetPos .- playerPos
+
+-- getNextSpecificPoint :: (PlayerPos, SpotPos) -> Reader DataSet Position
+-- getNextSpecificPoint (playerPos, spotPos) =
+
+
+
+findPlanetsInSegment :: Segment -> Reader DataSet [Index]
+findPlanetsInSegment segment@(startPos, endPos)
+  | startPos == endPos = getPlanetsInPoint startPos
+  | otherwise = do
+    dataSet <- ask
+    planetsInPoint <- getPlanetsInPoint startPos
+    nextSpecificPoint <- getNextSpecificPoint segment
+    ((++) planetsInPoint) `fmap` nextCalc
+    where nextCalc = findPlanetsInSegment (nextSpecificPoint endPos)
 
 doLogic :: Int -> IO ()
 doLogic iteration = do

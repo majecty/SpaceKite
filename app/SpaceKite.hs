@@ -1,4 +1,4 @@
-module Main where
+module SpaceKite(getDistance) where
 
 import Control.Applicative
 import Data.Maybe
@@ -104,6 +104,29 @@ readDataSet = do
   playerPos <- readPos
   spotPoses <- readPositions (numOfSpot header)
   return $ DataSet header planetPoses playerPos spotPoses
+
+(.-) :: Position -> Position -> Position
+(.-) (lx, ly, lz) (rx, ry, rz) = (lx - rx, ly - ry, lz - rz)
+
+dot :: Position -> Position -> Int
+dot (lx, ly, lz) (rx, ry, rz) = (lx * rx) + (ly * ry) + (lz * rz)
+
+magnitude :: Floating a => Position -> a
+magnitude (x, y, z) = sqrt (fx * fx + fy * fy + fz * fz)
+  where fx = fromIntegral x
+        fy = fromIntegral y
+        fz = fromIntegral z
+
+getDistance :: Floating a => (Position, Position) -> Position -> a
+getDistance (startPosition, arrivalPosition) planetPosition =
+  let vecA = arrivalPosition .- startPosition in
+  let vecB = planetPosition .- startPosition in
+  let cosTheta = dotf vecA vecB / ((magnitude vecA) * (magnitude vecB)) in
+  let sinTheta = sqrt $ 1 - (cosTheta * cosTheta) in
+  sinTheta * (magnitude vecB)
+    where dotf x y = fromIntegral $ dot x y
+  
+-- TODO: is suseon in segment
 
 doLogic :: Int -> IO ()
 doLogic iteration = do

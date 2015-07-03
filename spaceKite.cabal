@@ -21,7 +21,7 @@ library
 
 executable spaceKite-exe
   hs-source-dirs:      app
-  main-is:             Main.hs
+  main-is:             SpaceKite.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
                      , spaceKite
@@ -29,7 +29,7 @@ executable spaceKite-exe
 
 test-suite spaceKite-test
   type:                exitcode-stdio-1.0
-  hs-source-dirs:      test
+  hs-source-dirs:      test, app
   main-is:             Spec.hs
   build-depends:       base
                      , spaceKite

@@ -5,6 +5,7 @@
 module Main where
 
 import Control.Applicative
+import Data.List
 import Data.Maybe
 
 data Parser a = Parser { parse :: String -> Maybe (a, String) }
@@ -159,7 +160,7 @@ isCommunicatable dataSet segment (index, planetPos) =
         inSegment = isInSegment segment planetPos
 
 getCommunicatablePlanets :: DataSet -> [Index]
-getCommunicatablePlanets dataSet = do
+getCommunicatablePlanets dataSet = nub $ do
   segment <- createSegments dataSet
   indexWithPlanet <- zip [1..] $ planetPoses dataSet
   let maybeIndex = isCommunicatable dataSet segment indexWithPlanet

@@ -38,8 +38,8 @@ consume = Parser $
 parseFail :: Parser ()
 parseFail = Parser $ \_ -> Nothing
 
-readInteger :: Parser Integer
-readInteger = Parser $ listToMaybe `fmap` reads
+readInt :: Parser Int
+readInt = Parser $ listToMaybe `fmap` reads
 
 readWhiteSpace :: Parser ()
 readWhiteSpace = do
@@ -58,21 +58,21 @@ maybeHead :: [a] -> Maybe a
 maybeHead lst = listToMaybe $ take 1 lst
 
 data Header = Header {
-  numOfPlanet :: Integer,
-  numOfSpot :: Integer,
-  planetRadious :: Integer,
-  communicationDistance :: Integer
+  numOfPlanet :: Int,
+  numOfSpot :: Int,
+  planetRadious :: Int,
+  communicationDistance :: Int
 } deriving Show
 
 readHeader :: Parser Header
 readHeader = Header `fmap` numOfPlanet <*> numOfSpot <*> planetRadious <*> communicationDistance
   where
-    numOfPlanet = readInteger
-    numOfSpot = readWhiteSpace *> readInteger
-    planetRadious = readWhiteSpace *> readInteger
-    communicationDistance = readWhiteSpace *> readInteger
+    numOfPlanet = readInt
+    numOfSpot = readWhiteSpace *> readInt
+    planetRadious = readWhiteSpace *> readInt
+    communicationDistance = readWhiteSpace *> readInt
 
-doLogic :: Integer -> IO ()
+doLogic :: Int -> IO ()
 doLogic iteration = do
   line <- getLine
   let header = run readHeader line

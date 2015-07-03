@@ -166,6 +166,28 @@ getDistanceSquares dataSet = do
   spotPos <- planetPoses dataSet
   return $ getDistanceSquare segment spotPos
 
+data Direction = Approaching | GoingAway
+
+data DistanceAndDirection = DistanceAndDirection {
+  distanceSquare :: Int,
+  direction :: Direction
+}
+
+getDirection :: (PlayerPos, SpotPos) -> PlanetPos -> Direction
+getDirection (playerPos, spotPos) planetPos =
+  let vecA = spotPos .- playerPos in
+  let vecB = planetPos .- playerPos in
+  let dotAB = dot vecA vecB in
+  if dotAB >= 0 then GoingAway else Approaching
+
+getDistanceAndDirection :: (PlayerPos, SpotPos) -> PlanetPos -> DistanceAndDirection
+getDistanceAndDirection segment@(playerPos, spotPos) planetPos =
+  DistanceAndDirection {
+    distanceSquare = magnitudeSquare diffVec,
+    direction = getDirection segment planetPos
+  }
+    where diffVec = planetPos .- playerPos
+
 doLogic :: Int -> IO ()
 doLogic iteration = do
   allInput <- getContents

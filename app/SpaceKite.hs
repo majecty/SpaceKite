@@ -160,7 +160,7 @@ isCommunicatable dataSet segment (index, planetPos) =
         inSegment = isInSegment segment planetPos
 
 getCommunicatablePlanets :: DataSet -> [Index]
-getCommunicatablePlanets dataSet = nub $ do
+getCommunicatablePlanets dataSet = sort $ nub $ do
   indexWithPlanet <- zip [1..] $ planetPoses dataSet
   segment <- createSegments dataSet
   let maybeIndex = isCommunicatable dataSet segment indexWithPlanet

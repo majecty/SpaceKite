@@ -10,6 +10,7 @@ module Main where
 import Control.Applicative
 import Data.List
 import Data.Maybe
+import Data.Ord
 
 data Parser a = Parser { parse :: String -> Maybe (a, String) }
 
@@ -77,7 +78,11 @@ data Header = Header {
 
 type Position = (Rational, Rational, Rational)
 
-type PlanetPos = Position
+data PlanetPos = PlanetPos { index :: Index, position :: Position }
+  deriving (Eq, Show)
+
+instance Ord PlanetPos where
+  (<=) (PlanetPos lhsIndex  _) (PlanetPos rhsIndex _) = lhsIndex <= rhsIndex
 
 type PlayerPos = Position
 
@@ -89,6 +94,12 @@ data DataSet = DataSet {
   playerPos :: PlayerPos,
   spotPoses :: [SpotPos]
 } deriving Show
+
+newtype Sqrt = Sqrt Rational
+  deriving (Eq, Ord, Show)
+
+fromTuple :: (Index, Position) -> PlanetPos
+fromTuple (index, position) = PlanetPos index position
 
 readHeader :: Parser Header
 readHeader = Header `fmap` numOfPlanet <*> numOfSpot <*> planetRadious <*> communicationDistance
@@ -114,7 +125,8 @@ readDataSet = do
   planetPoses <- readPositions (numOfPlanet header)
   playerPos <- readPos
   spotPoses <- readPositions (numOfSpot header)
-  return $ DataSet header planetPoses playerPos spotPoses
+  return $ DataSet header (positionToPlanetPos planetPoses) playerPos spotPoses
+    where positionToPlanetPos positions = map fromTuple (zip [1..] positions)
 
 (.-) :: Position -> Position -> Position
 (.-) (lx, ly, lz) (rx, ry, rz) = (lx - rx, ly - ry, lz - rz)
@@ -126,11 +138,11 @@ interpolate :: Position -> Position -> Rational -> Position
 interpolate (lx, ly, lz) (rx, ry, rz) ratio = (interpolate1 lx rx, interpolate1 ly ry, interpolate1 lz rz)
   where interpolate1 a b = a * ratio + b * (1 - ratio)
 
-magnitudeSquare :: Position -> Rational
-magnitudeSquare (x, y, z) = x * x + y * y + z * z
+magnitude :: Position -> Sqrt
+magnitude (x, y, z) = Sqrt $ x * x + y * y + z * z
 
-distanceSquare :: Position -> Position -> Rational
-distanceSquare posX posY = magnitudeSquare (posX .- posY)
+distance :: Position -> Position -> Sqrt
+distance posX posY = magnitude (posX .- posY)
 
 type Segment = (Position, Position)
 
@@ -165,18 +177,6 @@ instance Functor (Reader e) where
     a <- ma
     return $ f a
 
-newtype Indexed a = Indexed (Index, a)
-  deriving Show
-
-instance Functor Indexed where
-  fmap f (Indexed (index, a)) = Indexed (index, f a)
-
-getValue :: Indexed a -> a
-getValue (Indexed (_, a)) = a
-
-getIndex :: Indexed a -> Index
-getIndex (Indexed (index, _)) = index
-
 getLimit :: Reader DataSet Int
 getLimit = do
   dataSet <- ask
@@ -184,41 +184,38 @@ getLimit = do
   let maxDistance = communicationDistance $ header dataSet
   return $ radious + maxDistance
 
-getPlanetsWithIndex :: Reader DataSet [(Indexed Position)]
-getPlanetsWithIndex = do
-  dataSet <- ask
-  return $ map Indexed $ zip [1..] (planetPoses dataSet)
+getPlanets :: Reader DataSet [PlanetPos]
+getPlanets = planetPoses `fmap` ask
 
-getPlanetsInPoint :: PlayerPos -> Reader DataSet [Index]
+getPlanetsInPoint :: PlayerPos -> Reader DataSet [PlanetPos]
 getPlanetsInPoint playerPos = do
   limit <- getLimit
-  planetsWithIndex <- getPlanetsWithIndex
-  let distanceSquaresWithIndex = (fmap distanceSquareFrom) `map` planetsWithIndex
-  let distanceSquares = map getValue distanceSquaresWithIndex
-  let minDistanceSquare = minimumBy compare distanceSquares
-  let minimumIndexes = map getIndex $ filter (isEqualInternalValue minDistanceSquare) distanceSquaresWithIndex 
-  return minimumIndexes
-    where distanceSquareFrom = distanceSquare playerPos
-          isEqualInternalValue value = (== value) . getValue
+  planetPoses <- getPlanets
+  let distances = distanceFromPlanet `map` planetPoses
+  let min = minDistance distances
+  return $ findPlanetByDistance min planetPoses
+   where distanceFromPlanet = (distance playerPos) . position
+         minDistance distances = foldr1 min distances
+         findPlanetByDistance minD = filter ((== minD) . distanceFromPlanet)
 
 getNextSpecificPoint :: Segment -> Rational -> Reader DataSet Rational
 getNextSpecificPoint segment@(_, endPos) currentRatio = return 1 -- FIXME: Not Implemented.
 
-findPlanetsInSegment :: Rational -> Segment -> Reader DataSet [Index]
+findPlanetsInSegment :: Rational -> Segment -> Reader DataSet [PlanetPos]
 findPlanetsInSegment 1 (_, endPos) = getPlanetsInPoint endPos
 findPlanetsInSegment currentRatio segment@(startPos, endPos) = do
   planetsInPoint <- getPlanetsInPoint $ interpolate startPos endPos currentRatio
   nextRatio <- getNextSpecificPoint segment currentRatio
   ((++) planetsInPoint) `fmap` (findPlanetsInSegment nextRatio segment)
 
-findAllPlanets :: Reader DataSet [Index]
+findAllPlanets :: Reader DataSet [PlanetPos]
 findAllPlanets = do
   dataSet <- ask
   let segments = createSegments dataSet
-  planetIndexes <- concat `fmap` mapM (findPlanetsInSegment 0) segments
-  return $ sort $ nub $ planetIndexes
+  planetPoses <- concat `fmap` mapM (findPlanetsInSegment 0) segments
+  return $ sort $ nub $ planetPoses
 
-runOnce :: DataSet -> [Index]
+runOnce :: DataSet -> [PlanetPos]
 runOnce dataSet = runReader findAllPlanets dataSet
 
 doLogic :: Int -> IO ()

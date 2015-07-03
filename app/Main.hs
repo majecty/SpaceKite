@@ -1,5 +1,6 @@
 module Main where
 
+import Control.Applicative
 import Data.Maybe
 
 data Parser a = Parser { parse :: String -> Maybe (a, String) }
@@ -12,6 +13,18 @@ instance Monad Parser where
             case firstParseResult of
               Nothing -> Nothing
               Just (middleResult, leftString) -> parse (f middleResult) leftString
+
+instance Applicative Parser where
+  pure x = Parser $ \input -> Just (x, input)
+  (<*>) mf ma = do
+    f <- mf
+    a <- ma
+    return $ f a
+
+instance Functor Parser where
+  fmap f ma = do
+    a <- ma
+    return $ f a
 
 readInteger :: Parser Integer
 readInteger = Parser $ listToMaybe `fmap` reads

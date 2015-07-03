@@ -26,8 +26,33 @@ instance Functor Parser where
     a <- ma
     return $ f a
 
+consume :: Parser ()
+consume = Parser $
+  \input -> case maybeHead input of
+               Nothing -> Nothing
+               _ -> Just $ ((), drop 1 input)
+
+parseFail :: Parser ()
+parseFail = Parser $ \_ -> Nothing
+
 readInteger :: Parser Integer
 readInteger = Parser $ listToMaybe `fmap` reads
+
+readWhiteSpace :: Parser ()
+readWhiteSpace = do
+  isWhite <- isWhiteSpace `fmap` lookAhead
+  if isWhite then consume else parseFail
+  where
+    isWhiteSpace c = c == ' '
+
+lookAhead :: Parser Char
+lookAhead = Parser $ \input ->
+  case maybeHead input of
+    Nothing -> Nothing
+    Just c -> Just (c, input)
+
+maybeHead :: [a] -> Maybe a
+maybeHead lst = listToMaybe $ take 1 lst
 
 data Header = Header {
   numOfPlanet :: Integer,

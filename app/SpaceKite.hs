@@ -79,7 +79,7 @@ data DataSet = DataSet {
   header :: Header,
   planetPoses :: [PlanetPos],
   playerPos :: PlayerPos,
-  spotPos :: [SpotPos]
+  spotPoses :: [SpotPos]
 } deriving Show
 
 readHeader :: Parser Header

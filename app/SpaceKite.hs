@@ -219,71 +219,40 @@ getPlanetsInPoint playerPos = do
          minDistance distances = foldr1 min distances
          findPlanetByDistance minD = filter ((== minD) . distanceFromPlanet)
 
-data Direction = Approaching | GoingAway
-  deriving (Eq, Show)
+minimumByL :: (a -> a -> Ordering) -> [a] -> [a]
+minimumByL _ [] = []
+minimumByL _ (x:[]) = [x]
+minimumByL comp (x:xs) =
+  case comp x subMinimum1 of
+    LT -> [x]
+    EQ -> x : subMinimum
+    GT -> subMinimum
+  where subMinimum = minimumByL comp xs
+        subMinimum1 = head subMinimum
 
-getDirection :: Segment -> PlanetPos -> Direction
-getDirection (currentPos, endPos) (PlanetPos _ planetPos) =
-  let vecA = endPos .- currentPos in
-  let vecB = planetPos .- currentPos in
-  let dotAB = dot vecA vecB in
-  if dotAB > 0 then Approaching else GoingAway
-
-isApproaching :: Segment -> PlanetPos -> Bool
-isApproaching segment planetPos = (== Approaching) $ getDirection segment planetPos
-
-isGoingAway :: Segment -> PlanetPos -> Bool
-isGoingAway segment planetPos = (== GoingAway) $ getDirection segment planetPos
-
-getInflectionPoint :: Segment -> PlanetPos -> Position
-getInflectionPoint segment@(startPos, endPos) (PlanetPos _ planetPos) =
-  let vecA = endPos .- startPos in
-  let vecB = planetPos .- startPos in
-  let dotAB = dot vecA vecB in
-  let ratio = dotAB / (square $ magnitude vecA) in
-  interpolate startPos endPos ratio
-
-getNearestApproachingPlanet :: Segment -> Reader DataSet (Maybe PlanetPos)
-getNearestApproachingPlanet segment@(startPos endPos) = do
+getNearestPlanet :: Segment -> Reader DataSet PlanetPos
+getNearestPlanet segment@(currentPos, endPos) = do
   planets <- getPlanets
-  let approachingPlanets = filter (isApproaching segment) planets
-  case approachingPlanets of
-    [] -> return Nothing
-    xs -> return nearest approachingPlanets
-            where nearest = minimumBy compareByDistance
-                  compareByDistance lPos rPos = compare (distance startPos lPos) (distance startPos rPos)
+  return $ maximumBy compareByDot (nearests planets)
+  where nearests = minimumByL compareByDistance
+        compareByDistance (PlanetPos _ lPos) (PlanetPos _ rPos) = compare (distance currentPos lPos) (distance currentPos rPos)
+        compareByDot (PlanetPos _ lPos) (PlanetPos _ rPos) = compare lDot rDot 
+          where lDot = dot (endPos .- currentPos) (lPos .- currentPos)
+                rDot = dot (endPos .- currentPos) (rPos .- currentPos)
+
+ -- contactPoint :: Segment -> PlanetPos -> PlanetPos -> Position
+ -- contactPoint segment (PlanetPos _ currentPos) (PlanetPos _ otherPos) =
+
+-- getNextContactPoint :: Segment -> PlanetPos -> Reader DataSet Position
+-- getNextContactPoint (currentPos, endPos) nearestPlanet = do
 
 getNextSpecificPoint :: Segment -> Rational -> Reader DataSet Rational
---getNextSpecificPoint segment@(_, endPos) currentRatio = return 1 -- FIXME: Not Implemented.
-getNextSpecificPoint segment@(startPos, endPos) currentRatio = do
-  nearestPlanets <- getPlanetsInPoint currentPos
-  let isAnyApproachingInNearest = any (isApproaching currentSegment) nearestPlanets
-  let isAnyGoingAwayInNearest = any (isGoingAway currentSegment) nearestPlanets
-  maybeNearestApproachingPlanet <- getNearestApproachingPlanet currentSegment
-  case (isAnyApproachingInNearest, isAnyGoingAwayInNearest, maybeNearestApproachingPlanet) of
-    (True, _, _) -> return $ unInterpolate segment $ nearest candidates
-              where candidates = endPos : (farthest' (getInflectionPoint segment `map` nearestApproachings))
-                    nearestApproachings = filter (isApproaching currentSegment) nearestPlanets
-                    farthest' [] = []
-                    farthest' xs = maximumBy compareByDistance xs : []
-                    nearest = minimumBy compareByDistance
-                    compareByDistance lPos rPos = compare (distance startPos lPos) (distance startPos rPos)
-    (False, True, Nothing) -> return 1
-    (False, True, Just nearestApproachingPlanet) -> return $ unInterpolate segment $ nearest candidates
-        where candidates = endPos : corssingPoint goingAwayPlanet nearestAproachingPlanet : []
-              goingAwayPlanet = find (isGoingAway currentSegment) nearestPlanets
-
-      -- find crossing point
-    _ -> return 1
-      -- find nearestApproaching
-  where currentPos = interpolate startPos endPos currentRatio
-        currentSegment = (currentPos, endPos)
-  -- is there approaching shortest planet?
+getNextSpecificPoint segment@(_, endPos) currentRatio = return 1 -- FIXME: Not Implemented.
 
 findPlanetsInSegment :: Rational -> Segment -> Reader DataSet [PlanetPos]
 findPlanetsInSegment 1 (_, endPos) = getPlanetsInPoint endPos
 findPlanetsInSegment currentRatio segment@(startPos, endPos) = do
-  planetsInPoint <- getPlanetsInPoint $ interpolate startPos endPos currentRatio
+  planetsInPoint <- getPlanetsInPoint $ interpolate startPos endPos currentRatio -- FIXME: should calculate in middle of segment
   nextRatio <- getNextSpecificPoint segment currentRatio
   ((++) planetsInPoint) `fmap` (findPlanetsInSegment nextRatio segment)
 

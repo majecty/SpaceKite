@@ -11,6 +11,7 @@ import Control.Applicative
 import Data.List
 import Data.Maybe
 import Data.Ord
+import Debug.Trace
 
 data Parser a = Parser { parse :: String -> Maybe (a, String) }
 
@@ -101,6 +102,9 @@ newtype Sqrt = Sqrt Rational
 fromTuple :: (Index, Position) -> PlanetPos
 fromTuple (index, position) = PlanetPos index position
 
+square :: Sqrt -> Rational
+square (Sqrt a) = a
+
 readHeader :: Parser Header
 readHeader = Header `fmap` numOfPlanet <*> numOfSpot <*> planetRadious <*> communicationDistance
   where
@@ -136,7 +140,24 @@ dot (lx, ly, lz) (rx, ry, rz) = (lx * rx) + (ly * ry) + (lz * rz)
 
 interpolate :: Position -> Position -> Rational -> Position
 interpolate (lx, ly, lz) (rx, ry, rz) ratio = (interpolate1 lx rx, interpolate1 ly ry, interpolate1 lz rz)
-  where interpolate1 a b = a * ratio + b * (1 - ratio)
+  where interpolate1 a b = a * (1 - ratio) + b * ratio
+
+unInterpolate :: Segment -> Position -> Rational
+unInterpolate (startPos, endPos) otherPos =
+  let vecA = endPos .- startPos in
+  let vecB = otherPos .- startPos in
+  let dotAB = dot vecA vecB in
+  dotAB / (square $ magnitude vecA)
+
+debugUnInterpolate :: Segment -> Position -> Rational
+debugUnInterpolate segment otherPos =
+  let output = unInterpolate segment otherPos in
+  trace
+    ("unInterPolate : segment " ++ (show segment) ++
+      ", otherPos " ++ (show otherPos) ++
+      ", result " ++ (show output)
+    )
+  output
 
 magnitude :: Position -> Sqrt
 magnitude (x, y, z) = Sqrt $ x * x + y * y + z * z
@@ -198,8 +219,44 @@ getPlanetsInPoint playerPos = do
          minDistance distances = foldr1 min distances
          findPlanetByDistance minD = filter ((== minD) . distanceFromPlanet)
 
+data Direction = Approaching | GoingAway
+  deriving (Eq, Show)
+
+getDirection :: Segment -> PlanetPos -> Direction
+getDirection (currentPos, endPos) (PlanetPos _ planetPos) =
+  let vecA = endPos .- currentPos in
+  let vecB = planetPos .- currentPos in
+  let dotAB = dot vecA vecB in
+  if dotAB > 0 then Approaching else GoingAway
+
+isApproaching :: Segment -> PlanetPos -> Bool
+isApproaching segment planetPos = (== Approaching) $ getDirection segment planetPos
+
+getInflectionPoint :: Segment -> PlanetPos -> Position
+getInflectionPoint segment@(startPos, endPos) (PlanetPos _ planetPos) =
+  let vecA = endPos .- startPos in
+  let vecB = planetPos .- startPos in
+  let dotAB = dot vecA vecB in
+  let ratio = dotAB / (square $ magnitude vecA) in
+  interpolate startPos endPos ratio
+
 getNextSpecificPoint :: Segment -> Rational -> Reader DataSet Rational
-getNextSpecificPoint segment@(_, endPos) currentRatio = return 1 -- FIXME: Not Implemented.
+--getNextSpecificPoint segment@(_, endPos) currentRatio = return 1 -- FIXME: Not Implemented.
+getNextSpecificPoint segment@(startPos, endPos) currentRatio = do
+  nearestPlanets <- getPlanetsInPoint currentPos
+  let isAnyApproaching = any (isApproaching currentSegment) nearestPlanets
+  case isAnyApproaching of
+    True -> return $ unInterpolate segment $ nearest candidates
+              where candidates = endPos : (farthest' (getInflectionPoint segment `map` nearestApproachings))
+                    nearestApproachings = filter (isApproaching currentSegment) nearestPlanets
+                    farthest' [] = []
+                    farthest' xs = maximumBy compareByDistance xs : []
+                    nearest = minimumBy compareByDistance
+                    compareByDistance lPos rPos = compare (distance startPos lPos) (distance startPos rPos)
+    False -> return 1
+  where currentPos = interpolate startPos endPos currentRatio
+        currentSegment = (currentPos, endPos)
+  -- is there approaching shortest planet?
 
 findPlanetsInSegment :: Rational -> Segment -> Reader DataSet [PlanetPos]
 findPlanetsInSegment 1 (_, endPos) = getPlanetsInPoint endPos

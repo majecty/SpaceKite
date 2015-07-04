@@ -208,17 +208,6 @@ getLimit = do
 getPlanets :: Reader DataSet [PlanetPos]
 getPlanets = planetPoses `fmap` ask
 
-getPlanetsInPoint :: PlayerPos -> Reader DataSet [PlanetPos]
-getPlanetsInPoint playerPos = do
-  limit <- getLimit
-  planetPoses <- getPlanets
-  let distances = distanceFromPlanet `map` planetPoses
-  let min = minDistance distances
-  return $ findPlanetByDistance min planetPoses
-   where distanceFromPlanet = (distance playerPos) . position
-         minDistance distances = foldr1 min distances
-         findPlanetByDistance minD = filter ((== minD) . distanceFromPlanet)
-
 minimumByL :: (a -> a -> Ordering) -> [a] -> [a]
 minimumByL _ [] = []
 minimumByL _ (x:[]) = [x]
@@ -230,37 +219,14 @@ minimumByL comp (x:xs) =
   where subMinimum = minimumByL comp xs
         subMinimum1 = head subMinimum
 
-getNearestPlanet :: Segment -> Reader DataSet PlanetPos
-getNearestPlanet segment@(currentPos, endPos) = do
-  planets <- getPlanets
-  return $ maximumBy compareByDot (nearests planets)
-  where nearests = minimumByL compareByDistance
-        compareByDistance (PlanetPos _ lPos) (PlanetPos _ rPos) = compare (distance currentPos lPos) (distance currentPos rPos)
-        compareByDot (PlanetPos _ lPos) (PlanetPos _ rPos) = compare lDot rDot 
-          where lDot = dot (endPos .- currentPos) (lPos .- currentPos)
-                rDot = dot (endPos .- currentPos) (rPos .- currentPos)
-
- -- contactPoint :: Segment -> PlanetPos -> PlanetPos -> Position
- -- contactPoint segment (PlanetPos _ currentPos) (PlanetPos _ otherPos) =
-
--- getNextContactPoint :: Segment -> PlanetPos -> Reader DataSet Position
--- getNextContactPoint (currentPos, endPos) nearestPlanet = do
-
-getNextSpecificPoint :: Segment -> Rational -> Reader DataSet Rational
-getNextSpecificPoint segment@(_, endPos) currentRatio = return 1 -- FIXME: Not Implemented.
-
-findPlanetsInSegment :: Rational -> Segment -> Reader DataSet [PlanetPos]
-findPlanetsInSegment 1 (_, endPos) = getPlanetsInPoint endPos
-findPlanetsInSegment currentRatio segment@(startPos, endPos) = do
-  planetsInPoint <- getPlanetsInPoint $ interpolate startPos endPos currentRatio -- FIXME: should calculate in middle of segment
-  nextRatio <- getNextSpecificPoint segment currentRatio
-  ((++) planetsInPoint) `fmap` (findPlanetsInSegment nextRatio segment)
+findPlanetsInSegment :: Segment -> Reader DataSet [PlanetPos]
+findPlanetsInSegment _ = return []
 
 findAllPlanets :: Reader DataSet [PlanetPos]
 findAllPlanets = do
   dataSet <- ask
   let segments = createSegments dataSet
-  planetPoses <- concat `fmap` mapM (findPlanetsInSegment 0) segments
+  planetPoses <- concat `fmap` mapM findPlanetsInSegment segments
   return $ sort $ nub $ planetPoses
 
 runOnce :: DataSet -> [PlanetPos]

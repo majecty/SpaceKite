@@ -219,8 +219,29 @@ minimumByL comp (x:xs) =
   where subMinimum = minimumByL comp xs
         subMinimum1 = head subMinimum
 
+dominant :: (PlanetPos, Sqrt, Sqrt) -> (PlanetPos, Sqrt, Sqrt) -> Bool
+dominant ((PlanetPos index1 _), distS1, distE1) ((PlanetPos index2 _), distS2, distE2) =
+  notSamePlanet && realDomniant
+    where realDomniant = (distS1 < distS2) && (distE1 < distE2)
+          notSamePlanet = index1 /= index2
+
 findPlanetsInSegment :: Segment -> Reader DataSet [PlanetPos]
-findPlanetsInSegment _ = return []
+--findPlanetsInSegment _ = return []
+findPlanetsInSegment segment@(startPos, endPos) = do
+  planets <- getPlanets
+  limit <- getLimit
+  let distancePairs = do
+        planet <- planets
+        let distanceFromStart = (distance startPos (position planet))
+        let distanceFromEnd = (distance endPos (position planet))
+        return (planet, distanceFromStart, distanceFromEnd)
+  let goodSet = do
+        distancePair@(planetPos , _, _) <- distancePairs
+        let isGood = all (not . dominant distancePair) distancePairs
+        if isGood && limit * limit <= square
+           then return planetPos
+           else []
+  return goodSet
 
 findAllPlanets :: Reader DataSet [PlanetPos]
 findAllPlanets = do
@@ -240,7 +261,7 @@ doLogic iteration = do
   let results = case maybeDataSets of
                   Nothing -> []
                   Just dataSets -> map runOnce dataSets
-  print $ show $ results
+  print $ show $ fmap index `map` results
   -- where resultToStr lst =
   --         let lstWithCount = length lst : lst in
   --         let strs = map show lstWithCount in

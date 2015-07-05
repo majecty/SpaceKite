@@ -51,8 +51,8 @@ parseFail = Parser $ \_ -> Nothing
 readInt :: Parser Int
 readInt = Parser $ listToMaybe `fmap` reads
 
-readRational :: Parser Rational
-readRational = fromIntegral `fmap` readInt
+readDouble :: Parser Double
+readDouble = fromIntegral `fmap` readInt
 
 readWhiteSpace :: Parser ()
 readWhiteSpace = do
@@ -77,7 +77,7 @@ data Header = Header {
   communicationDistance :: Int
 } deriving Show
 
-type Position = (Rational, Rational, Rational)
+type Position = (Double, Double, Double)
 
 data PlanetPos = PlanetPos { index :: Index, position :: Position }
   deriving (Eq, Show)
@@ -96,14 +96,8 @@ data DataSet = DataSet {
   spotPoses :: [SpotPos]
 } deriving Show
 
-newtype Sqrt = Sqrt Rational
-  deriving (Eq, Ord, Show)
-
 fromTuple :: (Index, Position) -> PlanetPos
 fromTuple (index, position) = PlanetPos index position
-
-square :: Sqrt -> Rational
-square (Sqrt a) = a
 
 readHeader :: Parser Header
 readHeader = Header `fmap` numOfPlanet <*> numOfSpot <*> planetRadious <*> communicationDistance
@@ -116,9 +110,9 @@ readHeader = Header `fmap` numOfPlanet <*> numOfSpot <*> planetRadious <*> commu
 readPos :: Parser Position
 readPos = (,,) `fmap` x <*> y <*> z
   where
-    x = readRational
-    y = readWhiteSpace *> readRational
-    z = readWhiteSpace *> readRational
+    x = readDouble
+    y = readWhiteSpace *> readDouble
+    z = readWhiteSpace *> readDouble
 
 readPositions :: Int -> Parser [Position]
 readPositions numOfPosition = sequence $ take numOfPosition $ repeat readPos
@@ -135,21 +129,21 @@ readDataSet = do
 (.-) :: Position -> Position -> Position
 (.-) (lx, ly, lz) (rx, ry, rz) = (lx - rx, ly - ry, lz - rz)
 
-dot :: Position -> Position -> Rational
+dot :: Position -> Position -> Double
 dot (lx, ly, lz) (rx, ry, rz) = (lx * rx) + (ly * ry) + (lz * rz)
 
-interpolate :: Position -> Position -> Rational -> Position
+interpolate :: Position -> Position -> Double -> Position
 interpolate (lx, ly, lz) (rx, ry, rz) ratio = (interpolate1 lx rx, interpolate1 ly ry, interpolate1 lz rz)
   where interpolate1 a b = a * (1 - ratio) + b * ratio
 
-unInterpolate :: Segment -> Position -> Rational
+unInterpolate :: Segment -> Position -> Double
 unInterpolate (startPos, endPos) otherPos =
   let vecA = endPos .- startPos in
   let vecB = otherPos .- startPos in
   let dotAB = dot vecA vecB in
-  dotAB / (square $ magnitude vecA)
+  dotAB / (magnitudeSquare vecA)
 
-debugUnInterpolate :: Segment -> Position -> Rational
+debugUnInterpolate :: Segment -> Position -> Double
 debugUnInterpolate segment otherPos =
   let output = unInterpolate segment otherPos in
   trace
@@ -159,10 +153,13 @@ debugUnInterpolate segment otherPos =
     )
   output
 
-magnitude :: Position -> Sqrt
-magnitude (x, y, z) = Sqrt $ x * x + y * y + z * z
+magnitude :: Position -> Double
+magnitude (x, y, z) = sqrt $ x * x + y * y + z * z
 
-distance :: Position -> Position -> Sqrt
+magnitudeSquare :: Position -> Double
+magnitudeSquare (x, y, z) = x * x + y * y + z * z
+
+distance :: Position -> Position -> Double
 distance posX posY = magnitude (posX .- posY)
 
 type Segment = (Position, Position)
@@ -204,6 +201,9 @@ getLimit = do
   let radious = planetRadious $ header dataSet
   let maxDistance = communicationDistance $ header dataSet
   return $ radious + maxDistance
+
+epsilon :: Double
+epsilon = 0.00000001
 
 getPlanets :: Reader DataSet [PlanetPos]
 getPlanets = planetPoses `fmap` ask

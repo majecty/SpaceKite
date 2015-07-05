@@ -205,11 +205,23 @@ getLimit = do
 epsilon :: Double
 epsilon = 0.00000001
 
+isEqual :: Double -> Double -> Bool
+isEqual a b = abs (a - b) < epsilon
+
 getPlanets :: Reader DataSet [PlanetPos]
 getPlanets = planetPoses `fmap` ask
 
 findPlanetsInSegment :: Segment -> Reader DataSet [PlanetPos]
-findPlanetsInSegment _ = return []
+findPlanetsInSegment segment = findPlanetsInSegmentIng segment 0
+
+findInCurrentPos :: Segment -> Double -> Reader DataSet [PlanetPos]
+findInCurrentPos _ _ = return []
+
+findPlanetsInSegmentIng :: Segment -> Double -> Reader DataSet [PlanetPos]
+findPlanetsInSegmentIng segment@(startPos, endPos) ratio
+  | isEqual ratio 1 = return []
+  | otherwise = (++) `fmap` (findInCurrentPos segment ratio) <*> findPlanetsInSegmentIng segment nextRatio
+      where nextRatio = 1
 
 findAllPlanets :: Reader DataSet [PlanetPos]
 findAllPlanets = do

@@ -162,6 +162,9 @@ magnitudeSquare (x, y, z) = x * x + y * y + z * z
 distance :: Position -> Position -> Double
 distance posX posY = magnitude (posX .- posY)
 
+distanceSquare :: Position -> Position -> Double
+distanceSquare posX posY = magnitudeSquare (posX .- posY)
+
 type Segment = (Position, Position)
 
 createSegments :: DataSet -> [Segment]
@@ -215,11 +218,23 @@ findPlanetsInSegment :: Segment -> Reader DataSet [PlanetPos]
 findPlanetsInSegment segment = findPlanetsInSegmentIng segment 0
 
 findInCurrentPos :: Segment -> Double -> Reader DataSet [PlanetPos]
-findInCurrentPos _ _ = return []
+findInCurrentPos segment@(startPos, endPos) ratio = do
+  planets <- getPlanets
+  limit <- getLimit
+  let planetWithDistances = map makePlanetDistance planets
+  let sortedPlanets = sortByDistance planetWithDistances
+  let minimumDistance = snd $ head sortedPlanets
+  if minimumDistance <= (fromIntegral $ limit * limit)
+     then return $ map fst $ filter (filterLimit minimumDistance) sortedPlanets
+     else return []
+  where currentPos = interpolate startPos endPos ratio
+        sortByDistance = sortBy (\(_, d1) (_, d2) -> compare d1 d2)
+        makePlanetDistance planet@(PlanetPos _ pos) = (planet, (distanceSquare pos currentPos))
+        filterLimit limit (_, distance) = (distance <= limit)
 
 findPlanetsInSegmentIng :: Segment -> Double -> Reader DataSet [PlanetPos]
 findPlanetsInSegmentIng segment@(startPos, endPos) ratio
-  | isEqual ratio 1 = return []
+  | isEqual ratio 1 = findInCurrentPos segment 1
   | otherwise = (++) `fmap` (findInCurrentPos segment ratio) <*> findPlanetsInSegmentIng segment nextRatio
       where nextRatio = 1
 

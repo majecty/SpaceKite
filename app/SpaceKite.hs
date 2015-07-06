@@ -199,7 +199,38 @@ instance Functor (Reader e) where
     a <- ma
     return $ f a
 
-getLimit :: Reader DataSet Int
+data State s a = State { runState :: s -> (a, s) }
+
+instance Monad (State s) where
+  return x = State $ \s -> (x, s)
+  (>>=) (State state) f = State $ \s ->
+    let (midResult, midState) = state s in
+    runState (f midResult) midState
+
+class (Monad m) => MonadState s m | m -> s where
+  get :: m s
+  put :: s -> m ()
+
+instance MonadState s (State s) where
+  get = State $ \s -> (s, s)
+  put newS = State $ \_ -> ((), newS)
+
+instance MonadReader s (State s) where
+  ask = get
+
+instance Applicative (State s) where
+  pure x = return x
+  (<*>) mf ma = do
+    f <- mf
+    a <- ma
+    return $ f a
+
+instance Functor (State a) where
+  fmap f ma = do
+    a <- ma
+    return $ f a
+
+getLimit :: State DataSet Int
 getLimit = do
   dataSet <- ask
   let radious = planetRadious $ header dataSet
@@ -212,13 +243,13 @@ epsilon = 0.00000001
 isEqual :: Double -> Double -> Bool
 isEqual a b = abs (a - b) < epsilon
 
-getPlanets :: Reader DataSet [PlanetPos]
+getPlanets :: State DataSet [PlanetPos]
 getPlanets = planetPoses `fmap` ask
 
-findPlanetsInSegment :: Segment -> Reader DataSet [PlanetPos]
+findPlanetsInSegment :: Segment -> State DataSet [PlanetPos]
 findPlanetsInSegment segment = findPlanetsInSegmentIng segment 0
 
-findNearestPlanets :: Segment -> Double -> Reader DataSet [PlanetPos]
+findNearestPlanets :: Segment -> Double -> State DataSet [PlanetPos]
 findNearestPlanets segment@(startPos, endPos) ratio = do
   planets <- getPlanets
   let planetWithDistances = map makePlanetDistance planets
@@ -230,13 +261,13 @@ findNearestPlanets segment@(startPos, endPos) ratio = do
         makePlanetDistance planet@(PlanetPos _ pos) = (planet, (distanceSquare pos currentPos))
         filterLimit limit (_, distance) = (distance <= limit)
 
-findNearestPlanet :: Segment -> Double -> Reader DataSet PlanetPos
+findNearestPlanet :: Segment -> Double -> State DataSet PlanetPos
 findNearestPlanet segment@(startPos, endPos) ratio = do
   nearestPlanets <- findNearestPlanets segment ratio
   return $ head $ sortWith dot_ nearestPlanets
     where dot_ (PlanetPos _ planetPos) = dot planetPos (endPos .- startPos)
 
-findInCurrentPos :: Segment -> Double -> Reader DataSet [PlanetPos]
+findInCurrentPos :: Segment -> Double -> State DataSet [PlanetPos]
 findInCurrentPos segment@(startPos, endPos) ratio = do
   nearestPlanets <- findNearestPlanets segment ratio
   limit <- getLimit
@@ -266,7 +297,7 @@ findContactPoint segment@(startPos, endPos) p1@(PlanetPos _ prevPlanetPos) p2@(P
         p_nm = p_m .- p_n
         m_nm = interpolate p_m p_n 0.5
 
-findNextRatio :: Segment -> Double -> Reader DataSet Double
+findNextRatio :: Segment -> Double -> State DataSet Double
 findNextRatio segment currentRatio = do
   planets <- getPlanets
   limit <- getLimit
@@ -291,7 +322,7 @@ findFootOfPerpendicularInSegment :: Segment -> Position -> Maybe Position
 findFootOfPerpendicularInSegment segment@(startPos, endPos) position =
   interpolate startPos endPos `fmap` (findFootOfPerpendicularRatio segment position)
 
-findPlanetsInSegmentIng :: Segment -> Double -> Reader DataSet [PlanetPos]
+findPlanetsInSegmentIng :: Segment -> Double -> State DataSet [PlanetPos]
 findPlanetsInSegmentIng segment@(startPos, endPos) ratio
   | isEqual ratio 1 = findInCurrentPos segment 1
   | otherwise = (++) `fmap` planetsInStartPos <*> planetsInLeft
@@ -299,7 +330,7 @@ findPlanetsInSegmentIng segment@(startPos, endPos) ratio
             planetsInStartPos = findInCurrentPos segment ratio
             planetsInLeft = nextRatio >>= findPlanetsInSegmentIng segment
 
-findAllPlanets :: Reader DataSet [PlanetPos]
+findAllPlanets :: State DataSet [PlanetPos]
 findAllPlanets = do
   dataSet <- ask
   let segments = createSegments dataSet
@@ -307,7 +338,7 @@ findAllPlanets = do
   return $ sort $ nub $ planetPoses
 
 runOnce :: DataSet -> [PlanetPos]
-runOnce dataSet = runReader findAllPlanets dataSet
+runOnce dataSet = fst $ runState findAllPlanets dataSet
 
 doLogic :: Int -> IO ()
 doLogic iteration = do

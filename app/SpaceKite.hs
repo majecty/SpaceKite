@@ -247,7 +247,7 @@ getPlanets :: State DataSet [PlanetPos]
 getPlanets = planetPoses `fmap` ask
 
 findPlanetsInSegment :: Segment -> State DataSet [PlanetPos]
-findPlanetsInSegment segment = findPlanetsInSegmentIng segment 0
+findPlanetsInSegment segment = findPlanetsInSegmentIng segment $! 0
 
 findNearestPlanets :: Segment -> Float -> State DataSet [PlanetPos]
 findNearestPlanets segment@(startPos, endPos) ratio = do
@@ -328,7 +328,7 @@ findPlanetsInSegmentIng segment@(startPos, endPos) ratio
   | otherwise = (++) `fmap` planetsInStartPos <*> planetsInLeft
       where nextRatio = findNextRatio segment ratio
             planetsInStartPos = findInCurrentPos segment ratio
-            planetsInLeft = nextRatio >>= findPlanetsInSegmentIng segment
+            planetsInLeft = nextRatio >>= \x -> findPlanetsInSegmentIng segment $! x
 
 findAllPlanets :: State DataSet [PlanetPos]
 findAllPlanets = do

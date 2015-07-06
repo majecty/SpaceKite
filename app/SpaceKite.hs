@@ -223,7 +223,6 @@ findNearestPlanets segment@(startPos, endPos) ratio = do
   planets <- getPlanets
   let planetWithDistances = map makePlanetDistance planets
   let sortedPlanets = sortByDistance planetWithDistances
-  -- traceM $ "findNearestPlanets sorted " ++ show sortedPlanets
   let minimumDistance = snd $ head sortedPlanets
   return $ map fst $ filter (filterLimit minimumDistance) sortedPlanets
   where currentPos = interpolate startPos endPos ratio
@@ -240,7 +239,6 @@ findNearestPlanet segment@(startPos, endPos) ratio = do
 findInCurrentPos :: Segment -> Double -> Reader DataSet [PlanetPos]
 findInCurrentPos segment@(startPos, endPos) ratio = do
   nearestPlanets <- findNearestPlanets segment ratio
-  --traceM $ "findInCurrentPos: nearestPlanets " ++ show nearestPlanets ++ " segment " ++ show segment ++ " ratio " ++ show ratio
   limit <- getLimit
   let limit2 = fromIntegral $ limit * limit
   return $ filter ((<= limit2) . distance2) nearestPlanets
@@ -256,11 +254,11 @@ normalize (startPos, endPos) planetPos = (x, y, 0)
 
 findContactPoint :: Segment -> PlanetPos -> PlanetPos -> Double
 findContactPoint segment@(startPos, endPos) p1@(PlanetPos _ prevPlanetPos) p2@(PlanetPos _ otherPlanetPos) =
-  let up = trace (show (segment, p1, p2)) $ dot p_nm (m_nm .- s) in
+  let up = dot p_nm (m_nm .- s) in
   let below = dot p_nm (e .- s) in
   if isEqual below 0
     then 100 -- FIXME
-    else traceShow ("p_n", p_n, "p_m", p_m, "s", s, "e", e, "up", up, "below", below) $ up / below
+    else up / below
   where p_n = normalize segment prevPlanetPos
         p_m = normalize segment otherPlanetPos
         s = (0, 0, 0)
@@ -329,12 +327,15 @@ doLogic iteration = do
   let results = case maybeDataSets of
                   Nothing -> []
                   Just dataSets -> map runOnce dataSets
-  print $ show $ fmap index `map` results
-  -- where resultToStr lst =
-  --         let lstWithCount = length lst : lst in
-  --         let strs = map show lstWithCount in
-  --         concat $ intersperse " " strs
-  print $ show $ maybeDataSets
+  -- print $ show $ fmap index `map` results
+  let resultIndexes = fmap index `map` results
+  let resultStrs = map resultToStr resultIndexes
+  mapM_ putStrLn resultStrs
+  where resultToStr lst =
+          let lstWithCount = length lst : lst in
+          let strs = map show lstWithCount in
+          concat $ intersperse " " strs
+  -- print $ show $ maybeDataSets
 
 main :: IO ()
 main = do

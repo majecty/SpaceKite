@@ -100,13 +100,13 @@ data DataSet = DataSet {
 -- dataSet, already counted planets, ignoreList for segment
 type DataWithCache = (DataSet, [PlanetPos], [PlanetPos])
 
-_1 :: DataWithCache -> DataSet
+_1 :: (a,b,c) -> a
 _1 (a, _, _) = a
 
-_2 :: DataWithCache -> [PlanetPos]
+_2 :: (a,b,c) -> b
 _2 (_, b, _) = b
 
-_3 :: DataWithCache -> [PlanetPos]
+_3 :: (a,b,c) -> c
 _3 (_, _, c) = c
 
 fromTuple :: (Index, Position) -> PlanetPos
@@ -265,8 +265,18 @@ getPlanets withCache =
 getCache :: State DataWithCache [PlanetPos]
 getCache = _2 `fmap` ask
 
+getIgnoreList :: State DataWithCache [PlanetPos]
+getIgnoreList = _3 `fmap` ask
+
+clearIgnoreList :: State DataWithCache ()
+clearIgnoreList = do
+  (dataSet, beforePlanets, _) <- get
+  put (dataSet, beforePlanets, [])
+
 findPlanetsInSegment :: Segment -> State DataWithCache [PlanetPos]
-findPlanetsInSegment segment = findPlanetsInSegmentIng segment $! 0
+findPlanetsInSegment segment = do
+  clearIgnoreList
+  findPlanetsInSegmentIng segment $! 0
 
 findNearestPlanets :: Segment -> Float -> Bool -> State DataWithCache [PlanetPos]
 findNearestPlanets segment@(startPos, endPos) ratio withCache = do
@@ -316,14 +326,31 @@ findContactPoint segment@(startPos, endPos) p1@(PlanetPos _ prevPlanetPos) p2@(P
         p_nm = p_m .- p_n
         m_nm = interpolate p_m p_n 0.5
 
+getPlanetsUsingIgnoreList :: State DataWithCache [PlanetPos]
+getPlanetsUsingIgnoreList = do
+  planets <- getPlanets False
+  ignoreList <- getIgnoreList
+  return $ planets \\ ignoreList
+
+addToIgnoreLIst :: [PlanetPos] -> State DataWithCache ()
+addToIgnoreLIst planets = do
+  (dataSet, beforePlanets, ignoreList) <- get
+  put (dataSet, beforePlanets, ignoreList ++ planets)
+
 findNextRatio :: Segment -> Float -> State DataWithCache Float
 findNextRatio segment currentRatio = do
-  planets <- getPlanets False
+  planets <- getPlanetsUsingIgnoreList
   limit <- getLimit
   currentPlanet <- findNearestPlanet segment currentRatio
-  let contactPoints = map (findContactPoint segment currentPlanet) planets
+  let contactPoints = do
+        planet <- planets
+        let contactPoint = findContactPoint segment currentPlanet planet
+        if 1 < contactPoint || contactPoint < currentRatio
+          then return (planet, True, contactPoint)
+          else return (planet, False, contactPoint)
+  addToIgnoreLIst $ map _1 (filter _2 contactPoints)
   let footOfPeripendicular = maybeToList $ findFootOfPerpendicularRatio segment (position currentPlanet)
-  return $ head $ sort $ filter (\x -> (x > currentRatio) && (x <= 1)) (1 : (contactPoints ++ footOfPeripendicular))
+  return $ head $ sort $ filter (\x -> (x > currentRatio) && (x <= 1)) (1 : ((map _3 contactPoints) ++ footOfPeripendicular))
 
 concat2 :: [a] -> [a] -> [a] -> [a]
 concat2 a b c = a ++ b ++ c

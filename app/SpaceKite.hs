@@ -97,7 +97,17 @@ data DataSet = DataSet {
   spotPoses :: [SpotPos]
 } deriving Show
 
-type DataWithCache = (DataSet, [PlanetPos])
+-- dataSet, already counted planets, ignoreList for segment
+type DataWithCache = (DataSet, [PlanetPos], [PlanetPos])
+
+_1 :: DataWithCache -> DataSet
+_1 (a, _, _) = a
+
+_2 :: DataWithCache -> [PlanetPos]
+_2 (_, b, _) = b
+
+_3 :: DataWithCache -> [PlanetPos]
+_3 (_, _, c) = c
 
 fromTuple :: (Index, Position) -> PlanetPos
 fromTuple (index, position) = PlanetPos index position
@@ -234,7 +244,7 @@ instance Functor (State a) where
 
 getLimit :: State DataWithCache Int
 getLimit = do
-  dataSet <- fst `fmap` ask
+  dataSet <- _1 `fmap` ask
   let radious = planetRadious $ header dataSet
   let maxDistance = communicationDistance $ header dataSet
   return $ radious + maxDistance
@@ -250,10 +260,10 @@ getPlanets withCache =
   case withCache of
     True -> (\\) `fmap` allPlanets <*> getCache
     False -> allPlanets
-  where allPlanets = planetPoses `fmap` fst `fmap` ask
+  where allPlanets = planetPoses `fmap` _1 `fmap` ask
 
 getCache :: State DataWithCache [PlanetPos]
-getCache = snd `fmap` ask
+getCache = _2 `fmap` ask
 
 findPlanetsInSegment :: Segment -> State DataWithCache [PlanetPos]
 findPlanetsInSegment segment = findPlanetsInSegmentIng segment $! 0
@@ -341,13 +351,13 @@ findPlanetsInSegmentIng segment@(startPos, endPos) ratio
 
 findAllPlanets :: State DataWithCache [PlanetPos]
 findAllPlanets = do
-  dataSet <- fst `fmap` ask
+  dataSet <- _1 `fmap` ask
   let segments = createSegments dataSet
   planetPoses <- concat `fmap` mapM findPlanetsInSegment segments
   return $ sort $ nub $ planetPoses
 
 runOnce :: DataSet -> [PlanetPos]
-runOnce dataSet = fst $ runState findAllPlanets (dataSet, [])
+runOnce dataSet = fst $ runState findAllPlanets (dataSet, [], [])
 
 doLogic :: Int -> IO ()
 doLogic iteration = do

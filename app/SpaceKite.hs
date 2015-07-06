@@ -52,8 +52,8 @@ parseFail = Parser $ \_ -> Nothing
 readInt :: Parser Int
 readInt = Parser $ listToMaybe `fmap` reads
 
-readDouble :: Parser Double
-readDouble = fromIntegral `fmap` readInt
+readFloat :: Parser Float
+readFloat = fromIntegral `fmap` readInt
 
 readWhiteSpace :: Parser ()
 readWhiteSpace = do
@@ -78,7 +78,7 @@ data Header = Header {
   communicationDistance :: Int
 } deriving Show
 
-type Position = (Double, Double, Double)
+type Position = (Float, Float, Float)
 
 data PlanetPos = PlanetPos { index :: Index, position :: Position }
   deriving (Eq, Show)
@@ -111,9 +111,9 @@ readHeader = Header `fmap` numOfPlanet <*> numOfSpot <*> planetRadious <*> commu
 readPos :: Parser Position
 readPos = (,,) `fmap` x <*> y <*> z
   where
-    x = readDouble
-    y = readWhiteSpace *> readDouble
-    z = readWhiteSpace *> readDouble
+    x = readFloat
+    y = readWhiteSpace *> readFloat
+    z = readWhiteSpace *> readFloat
 
 readPositions :: Int -> Parser [Position]
 readPositions numOfPosition = sequence $ take numOfPosition $ repeat readPos
@@ -130,21 +130,21 @@ readDataSet = do
 (.-) :: Position -> Position -> Position
 (.-) (lx, ly, lz) (rx, ry, rz) = (lx - rx, ly - ry, lz - rz)
 
-dot :: Position -> Position -> Double
+dot :: Position -> Position -> Float
 dot (lx, ly, lz) (rx, ry, rz) = (lx * rx) + (ly * ry) + (lz * rz)
 
-interpolate :: Position -> Position -> Double -> Position
+interpolate :: Position -> Position -> Float -> Position
 interpolate (lx, ly, lz) (rx, ry, rz) ratio = (interpolate1 lx rx, interpolate1 ly ry, interpolate1 lz rz)
   where interpolate1 a b = a * (1 - ratio) + b * ratio
 
-unInterpolate :: Segment -> Position -> Double
+unInterpolate :: Segment -> Position -> Float
 unInterpolate (startPos, endPos) otherPos =
   let vecA = endPos .- startPos in
   let vecB = otherPos .- startPos in
   let dotAB = dot vecA vecB in
   dotAB / (magnitudeSquare vecA)
 
-debugUnInterpolate :: Segment -> Position -> Double
+debugUnInterpolate :: Segment -> Position -> Float
 debugUnInterpolate segment otherPos =
   let output = unInterpolate segment otherPos in
   trace
@@ -154,16 +154,16 @@ debugUnInterpolate segment otherPos =
     )
   output
 
-magnitude :: Position -> Double
+magnitude :: Position -> Float
 magnitude (x, y, z) = sqrt $ x * x + y * y + z * z
 
-magnitudeSquare :: Position -> Double
+magnitudeSquare :: Position -> Float
 magnitudeSquare (x, y, z) = x * x + y * y + z * z
 
-distance :: Position -> Position -> Double
+distance :: Position -> Position -> Float
 distance posX posY = magnitude (posX .- posY)
 
-distanceSquare :: Position -> Position -> Double
+distanceSquare :: Position -> Position -> Float
 distanceSquare posX posY = magnitudeSquare (posX .- posY)
 
 type Segment = (Position, Position)
@@ -237,10 +237,10 @@ getLimit = do
   let maxDistance = communicationDistance $ header dataSet
   return $ radious + maxDistance
 
-epsilon :: Double
+epsilon :: Float
 epsilon = 0.00000001
 
-isEqual :: Double -> Double -> Bool
+isEqual :: Float -> Float -> Bool
 isEqual a b = abs (a - b) < epsilon
 
 getPlanets :: State DataSet [PlanetPos]
@@ -249,7 +249,7 @@ getPlanets = planetPoses `fmap` ask
 findPlanetsInSegment :: Segment -> State DataSet [PlanetPos]
 findPlanetsInSegment segment = findPlanetsInSegmentIng segment 0
 
-findNearestPlanets :: Segment -> Double -> State DataSet [PlanetPos]
+findNearestPlanets :: Segment -> Float -> State DataSet [PlanetPos]
 findNearestPlanets segment@(startPos, endPos) ratio = do
   planets <- getPlanets
   let planetWithDistances = map makePlanetDistance planets
@@ -261,13 +261,13 @@ findNearestPlanets segment@(startPos, endPos) ratio = do
         makePlanetDistance planet@(PlanetPos _ pos) = (planet, (distanceSquare pos currentPos))
         filterLimit limit (_, distance) = (distance <= limit)
 
-findNearestPlanet :: Segment -> Double -> State DataSet PlanetPos
+findNearestPlanet :: Segment -> Float -> State DataSet PlanetPos
 findNearestPlanet segment@(startPos, endPos) ratio = do
   nearestPlanets <- findNearestPlanets segment ratio
   return $ head $ sortWith dot_ nearestPlanets
     where dot_ (PlanetPos _ planetPos) = dot planetPos (endPos .- startPos)
 
-findInCurrentPos :: Segment -> Double -> State DataSet [PlanetPos]
+findInCurrentPos :: Segment -> Float -> State DataSet [PlanetPos]
 findInCurrentPos segment@(startPos, endPos) ratio = do
   nearestPlanets <- findNearestPlanets segment ratio
   limit <- getLimit
@@ -283,7 +283,7 @@ normalize (startPos, endPos) planetPos = (x, y, 0)
         l_2 = distanceSquare planetPos startPos
         y = sqrt (l_2 - x * x)
 
-findContactPoint :: Segment -> PlanetPos -> PlanetPos -> Double
+findContactPoint :: Segment -> PlanetPos -> PlanetPos -> Float
 findContactPoint segment@(startPos, endPos) p1@(PlanetPos _ prevPlanetPos) p2@(PlanetPos _ otherPlanetPos) =
   let up = dot p_nm (m_nm .- s) in
   let below = dot p_nm (e .- s) in
@@ -297,7 +297,7 @@ findContactPoint segment@(startPos, endPos) p1@(PlanetPos _ prevPlanetPos) p2@(P
         p_nm = p_m .- p_n
         m_nm = interpolate p_m p_n 0.5
 
-findNextRatio :: Segment -> Double -> State DataSet Double
+findNextRatio :: Segment -> Float -> State DataSet Float
 findNextRatio segment currentRatio = do
   planets <- getPlanets
   limit <- getLimit
@@ -309,7 +309,7 @@ findNextRatio segment currentRatio = do
 concat2 :: [a] -> [a] -> [a] -> [a]
 concat2 a b c = a ++ b ++ c
 
-findFootOfPerpendicularRatio :: Segment -> Position -> Maybe Double
+findFootOfPerpendicularRatio :: Segment -> Position -> Maybe Float
 findFootOfPerpendicularRatio (startPos, endPos) position =
   if r <= 0 || r >= 1
      then Nothing
@@ -322,7 +322,7 @@ findFootOfPerpendicularInSegment :: Segment -> Position -> Maybe Position
 findFootOfPerpendicularInSegment segment@(startPos, endPos) position =
   interpolate startPos endPos `fmap` (findFootOfPerpendicularRatio segment position)
 
-findPlanetsInSegmentIng :: Segment -> Double -> State DataSet [PlanetPos]
+findPlanetsInSegmentIng :: Segment -> Float -> State DataSet [PlanetPos]
 findPlanetsInSegmentIng segment@(startPos, endPos) ratio
   | isEqual ratio 1 = findInCurrentPos segment 1
   | otherwise = (++) `fmap` planetsInStartPos <*> planetsInLeft

@@ -97,6 +97,8 @@ data DataSet = DataSet {
   spotPoses :: [SpotPos]
 } deriving Show
 
+type DataWithCache = (DataSet, [PlanetPos])
+
 fromTuple :: (Index, Position) -> PlanetPos
 fromTuple (index, position) = PlanetPos index position
 
@@ -230,9 +232,9 @@ instance Functor (State a) where
     a <- ma
     return $ f a
 
-getLimit :: State DataSet Int
+getLimit :: State DataWithCache Int
 getLimit = do
-  dataSet <- ask
+  dataSet <- fst `fmap` ask
   let radious = planetRadious $ header dataSet
   let maxDistance = communicationDistance $ header dataSet
   return $ radious + maxDistance
@@ -243,13 +245,13 @@ epsilon = 0.00000001
 isEqual :: Float -> Float -> Bool
 isEqual a b = abs (a - b) < epsilon
 
-getPlanets :: State DataSet [PlanetPos]
-getPlanets = planetPoses `fmap` ask
+getPlanets :: State DataWithCache [PlanetPos]
+getPlanets = planetPoses `fmap` fst `fmap` ask
 
-findPlanetsInSegment :: Segment -> State DataSet [PlanetPos]
+findPlanetsInSegment :: Segment -> State DataWithCache [PlanetPos]
 findPlanetsInSegment segment = findPlanetsInSegmentIng segment $! 0
 
-findNearestPlanets :: Segment -> Float -> State DataSet [PlanetPos]
+findNearestPlanets :: Segment -> Float -> State DataWithCache [PlanetPos]
 findNearestPlanets segment@(startPos, endPos) ratio = do
   planets <- getPlanets
   let planetWithDistances = map makePlanetDistance planets
@@ -261,13 +263,13 @@ findNearestPlanets segment@(startPos, endPos) ratio = do
         makePlanetDistance planet@(PlanetPos _ pos) = (planet, (distanceSquare pos currentPos))
         filterLimit limit (_, distance) = (distance <= limit)
 
-findNearestPlanet :: Segment -> Float -> State DataSet PlanetPos
+findNearestPlanet :: Segment -> Float -> State DataWithCache PlanetPos
 findNearestPlanet segment@(startPos, endPos) ratio = do
   nearestPlanets <- findNearestPlanets segment ratio
   return $ head $ sortWith dot_ nearestPlanets
     where dot_ (PlanetPos _ planetPos) = dot planetPos (endPos .- startPos)
 
-findInCurrentPos :: Segment -> Float -> State DataSet [PlanetPos]
+findInCurrentPos :: Segment -> Float -> State DataWithCache [PlanetPos]
 findInCurrentPos segment@(startPos, endPos) ratio = do
   nearestPlanets <- findNearestPlanets segment ratio
   limit <- getLimit
@@ -297,7 +299,7 @@ findContactPoint segment@(startPos, endPos) p1@(PlanetPos _ prevPlanetPos) p2@(P
         p_nm = p_m .- p_n
         m_nm = interpolate p_m p_n 0.5
 
-findNextRatio :: Segment -> Float -> State DataSet Float
+findNextRatio :: Segment -> Float -> State DataWithCache Float
 findNextRatio segment currentRatio = do
   planets <- getPlanets
   limit <- getLimit
@@ -322,7 +324,7 @@ findFootOfPerpendicularInSegment :: Segment -> Position -> Maybe Position
 findFootOfPerpendicularInSegment segment@(startPos, endPos) position =
   interpolate startPos endPos `fmap` (findFootOfPerpendicularRatio segment position)
 
-findPlanetsInSegmentIng :: Segment -> Float -> State DataSet [PlanetPos]
+findPlanetsInSegmentIng :: Segment -> Float -> State DataWithCache [PlanetPos]
 findPlanetsInSegmentIng segment@(startPos, endPos) ratio
   | isEqual ratio 1 = findInCurrentPos segment 1
   | otherwise = (++) `fmap` planetsInStartPos <*> planetsInLeft
@@ -330,15 +332,15 @@ findPlanetsInSegmentIng segment@(startPos, endPos) ratio
             planetsInStartPos = findInCurrentPos segment ratio
             planetsInLeft = nextRatio >>= \x -> findPlanetsInSegmentIng segment $! x
 
-findAllPlanets :: State DataSet [PlanetPos]
+findAllPlanets :: State DataWithCache [PlanetPos]
 findAllPlanets = do
-  dataSet <- ask
+  dataSet <- fst `fmap` ask
   let segments = createSegments dataSet
   planetPoses <- concat `fmap` mapM findPlanetsInSegment segments
   return $ sort $ nub $ planetPoses
 
 runOnce :: DataSet -> [PlanetPos]
-runOnce dataSet = fst $ runState findAllPlanets dataSet
+runOnce dataSet = fst $ runState findAllPlanets (dataSet, [])
 
 doLogic :: Int -> IO ()
 doLogic iteration = do

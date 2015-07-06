@@ -258,7 +258,7 @@ isEqual a b = abs (a - b) < epsilon
 getPlanets :: Bool -> State DataWithCache [PlanetPos]
 getPlanets withCache =
   case withCache of
-    True -> (\\) `fmap` allPlanets <*> getCache
+    True -> getCache
     False -> allPlanets
   where allPlanets = planetPoses `fmap` _1 `fmap` ask
 
@@ -341,10 +341,21 @@ findFootOfPerpendicularInSegment :: Segment -> Position -> Maybe Position
 findFootOfPerpendicularInSegment segment@(startPos, endPos) position =
   interpolate startPos endPos `fmap` (findFootOfPerpendicularRatio segment position)
 
+addNewPlanets :: [PlanetPos] -> State DataWithCache ()
+addNewPlanets planets = do
+  (dataSet, beforePlanets, ignoreForSegment) <- get
+  put (dataSet, (beforePlanets \\ planets), ignoreForSegment)
+
 findPlanetsInSegmentIng :: Segment -> Float -> State DataWithCache [PlanetPos]
 findPlanetsInSegmentIng segment@(startPos, endPos) ratio
-  | isEqual ratio 1 = findInCurrentPos segment 1
-  | otherwise = (++) `fmap` planetsInStartPos <*> planetsInLeft
+  | isEqual ratio 1 = do
+    newPlanets <- findInCurrentPos segment 1
+    addNewPlanets newPlanets
+    return newPlanets
+  | otherwise = do
+    newPlanets <- (++) `fmap` planetsInStartPos <*> planetsInLeft
+    addNewPlanets newPlanets
+    return newPlanets
       where nextRatio = findNextRatio segment ratio
             planetsInStartPos = findInCurrentPos segment ratio
             planetsInLeft = nextRatio >>= \x -> findPlanetsInSegmentIng segment $! x
@@ -357,7 +368,7 @@ findAllPlanets = do
   return $ sort $ nub $ planetPoses
 
 runOnce :: DataSet -> [PlanetPos]
-runOnce dataSet = fst $ runState findAllPlanets (dataSet, [], [])
+runOnce dataSet = fst $ runState findAllPlanets (dataSet, planetPoses dataSet, [])
 
 doLogic :: Int -> IO ()
 doLogic iteration = do

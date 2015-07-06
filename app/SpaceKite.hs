@@ -245,15 +245,22 @@ epsilon = 0.00000001
 isEqual :: Float -> Float -> Bool
 isEqual a b = abs (a - b) < epsilon
 
-getPlanets :: State DataWithCache [PlanetPos]
-getPlanets = planetPoses `fmap` fst `fmap` ask
+getPlanets :: Bool -> State DataWithCache [PlanetPos]
+getPlanets withCache =
+  case withCache of
+    True -> (\\) `fmap` allPlanets <*> getCache
+    False -> allPlanets
+  where allPlanets = planetPoses `fmap` fst `fmap` ask
+
+getCache :: State DataWithCache [PlanetPos]
+getCache = snd `fmap` ask
 
 findPlanetsInSegment :: Segment -> State DataWithCache [PlanetPos]
 findPlanetsInSegment segment = findPlanetsInSegmentIng segment $! 0
 
-findNearestPlanets :: Segment -> Float -> State DataWithCache [PlanetPos]
-findNearestPlanets segment@(startPos, endPos) ratio = do
-  planets <- getPlanets
+findNearestPlanets :: Segment -> Float -> Bool -> State DataWithCache [PlanetPos]
+findNearestPlanets segment@(startPos, endPos) ratio withCache = do
+  planets <- getPlanets withCache
   let planetWithDistances = map makePlanetDistance planets
   let sortedPlanets = sortByDistance planetWithDistances
   let minimumDistance = snd $ head sortedPlanets
@@ -265,13 +272,13 @@ findNearestPlanets segment@(startPos, endPos) ratio = do
 
 findNearestPlanet :: Segment -> Float -> State DataWithCache PlanetPos
 findNearestPlanet segment@(startPos, endPos) ratio = do
-  nearestPlanets <- findNearestPlanets segment ratio
+  nearestPlanets <- findNearestPlanets segment ratio False
   return $ head $ sortWith dot_ nearestPlanets
     where dot_ (PlanetPos _ planetPos) = dot planetPos (endPos .- startPos)
 
 findInCurrentPos :: Segment -> Float -> State DataWithCache [PlanetPos]
 findInCurrentPos segment@(startPos, endPos) ratio = do
-  nearestPlanets <- findNearestPlanets segment ratio
+  nearestPlanets <- findNearestPlanets segment ratio True
   limit <- getLimit
   let limit2 = fromIntegral $ limit * limit
   return $ filter ((<= limit2) . distance2) nearestPlanets
@@ -301,7 +308,7 @@ findContactPoint segment@(startPos, endPos) p1@(PlanetPos _ prevPlanetPos) p2@(P
 
 findNextRatio :: Segment -> Float -> State DataWithCache Float
 findNextRatio segment currentRatio = do
-  planets <- getPlanets
+  planets <- getPlanets False
   limit <- getLimit
   currentPlanet <- findNearestPlanet segment currentRatio
   let contactPoints = map (findContactPoint segment currentPlanet) planets

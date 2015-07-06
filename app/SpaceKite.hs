@@ -291,22 +291,12 @@ findFootOfPerpendicularInSegment :: Segment -> Position -> Maybe Position
 findFootOfPerpendicularInSegment segment@(startPos, endPos) position =
   interpolate startPos endPos `fmap` (findFootOfPerpendicularRatio segment position)
 
--- findPlanetsInMiddleOfSegment :: Segment -> Double -> Double -> Reader DataSet [PlanetPos]
--- findPlanetsInMiddleOfSegment segment@(startPos, endPos) currentRatio nextRatio =
---   planets <- getPlanets
---   nearestPlanets <- findNearestPlanets segment currentRatio
---   return do
---     nearestPlanet <- nearestPlanets
---     where points = startPos : endPos : (specialPoint nearestPlanet)
---           specialPoint (PlanetPos _ planetPos) = maybeToList $ findFootOfPerpendicularInSegment segment nearestPlanet
--- 
 findPlanetsInSegmentIng :: Segment -> Double -> Reader DataSet [PlanetPos]
 findPlanetsInSegmentIng segment@(startPos, endPos) ratio
   | isEqual ratio 1 = findInCurrentPos segment 1
   | otherwise = (++) `fmap` planetsInStartPos <*> planetsInLeft
       where nextRatio = findNextRatio segment ratio
             planetsInStartPos = findInCurrentPos segment ratio
-            --planetsInCurrentRange = findPlanetsInMiddleOfSegment segment ratio nextRatio
             planetsInLeft = nextRatio >>= findPlanetsInSegmentIng segment
 
 findAllPlanets :: Reader DataSet [PlanetPos]
